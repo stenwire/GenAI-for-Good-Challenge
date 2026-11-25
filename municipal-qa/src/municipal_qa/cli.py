@@ -55,7 +55,21 @@ def index() -> None:
 @app.command("check-model")
 def check_model() -> None:
     """Verify Ollama, the configured model and its parameter count."""
-    _not_implemented("check-model")
+    from municipal_qa.config import load_config
+    from municipal_qa.llm.client import LLMClient, LLMError
+
+    client = LLMClient(load_config())
+    try:
+        info = client.check_model()
+    except LLMError as e:
+        typer.echo(f"FAILED: {e}", err=True)
+        raise typer.Exit(code=1) from e
+    finally:
+        client.close()
+    typer.echo(f"model: {info['name']}")
+    typer.echo(f"digest: {info['digest']}")
+    typer.echo(f"parameters: {info['parameter_count']:,} (cap {info['max_params']:,}) OK")
+    typer.echo(f"quantization: {info['quantization']}")
 
 
 @app.command()
