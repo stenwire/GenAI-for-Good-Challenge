@@ -1,0 +1,74 @@
+from pathlib import Path
+
+import pytest
+
+from municipal_qa.config import PROJECT_ROOT, Config, ConfigError, load_config
+
+
+@pytest.fixture
+def no_env(monkeypatch, tmp_path):
+    monkeypatch.delenv("MQA_DATA_DIR", raising=False)
+    return tmp_path / "missing.env"
+
+
+def test_env_var_expanded_from_environment(monkeypatch, no_env, tmp_path):
+    monkeypatch.setenv("MQA_DATA_DIR", str(tmp_path))
+    cfg = load_config(env_file=no_env)
+    assert isinstance(cfg, Config)
+    assert cfg.data_dir == tmp_path
+    assert cfg.sources_dir == tmp_path / "sources"
+
+
+def test_env_var_expanded_from_dotenv_file(no_env, tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(f"MQA_DATA_DIR={tmp_path / 'data'}\n")
+    cfg = load_config(env_file=env_file)
+    assert cfg.data_dir == tmp_path / "data"
+
+
+def test_environment_wins_over_dotenv(monkeypatch, tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text("MQA_DATA_DIR=/from/dotenv\n")
+    monkeypatch.setenv("MQA_DATA_DIR", "/from/shell")
+    assert load_config(env_file=env_file).data_dir == Path("/from/shell")
+
+
+def test_missing_data_dir_raises(no_env):
+    with pytest.raises(ConfigError, match="MQA_DATA_DIR"):
+        load_config(env_file=no_env)
+
+
+def test_defaults_match_plan(monkeypatch, no_env):
+    monkeypatch.setenv("MQA_DATA_DIR", "/d")
+    cfg = load_config(env_file=no_env)
+    assert cfg.llm.model == "qwen3:1.7b"
+    assert cfg.llm.max_params == 3_000_000_000
+    assert cfg.llm.think is False
+    assert cfg.llm.options == {"temperature": 0, "seed": 42, "num_ctx": 8192}
+    assert cfg.llm.num_predict == {
+        "route": 400,
+        "plan": 700,
+        "repair": 700,
+        "compose": 600,
+        "rewrite": 600,
+    }
+    assert (cfg.budget.max_calls, cfg.budget.max_generated_tokens) == (15, 12000)
+    assert cfg.retrieval.k_final == 8
+    assert cfg.artifacts_dir == PROJECT_ROOT / "artifacts"
+
+
+def test_overrides_deep_merge(monkeypatch, no_env):
+    monkeypatch.setenv("MQA_DATA_DIR", "/d")
+    cfg = load_config(
+        overrides={"llm": {"model": "other:1b"}, "run": {"workers": 3}}, env_file=no_env
+    )
+    assert cfg.llm.model == "other:1b"
+    assert cfg.llm.max_params == 3_000_000_000
+    assert cfg.run.workers == 3
+    assert cfg.run.resume is True
+
+
+def test_relative_path_resolves_from_any_cwd(monkeypatch, no_env, tmp_path):
+    monkeypatch.setenv("MQA_DATA_DIR", "/d")
+    monkeypatch.chdir(tmp_path)
+    assert load_config("configs/default.yaml", env_file=no_env).llm.model == "qwen3:1.7b"

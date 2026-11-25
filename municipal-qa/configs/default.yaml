@@ -1,0 +1,30 @@
+data_dir: ${MQA_DATA_DIR}
+artifacts_dir: artifacts
+llm:
+  provider: ollama
+  base_url: http://127.0.0.1:11434
+  model: qwen3:1.7b
+  max_params: 3000000000
+  options: {temperature: 0, seed: 42, num_ctx: 8192}
+  think: false
+  keep_alive: 10m
+  num_predict: {route: 400, plan: 700, repair: 700, compose: 600, rewrite: 600}
+budget:
+  max_calls: 15
+  max_generated_tokens: 12000
+  reserve_tokens_for_compose: 800
+retrieval:
+  embedding_model: intfloat/multilingual-e5-small   # encoder only, handles DE/FR/FI/MK/UK text
+  reranker_model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+  k_bm25: 30
+  k_dense: 30
+  k_final: 8
+  chunk_chars: 900
+  chunk_overlap: 150
+pipeline:
+  max_repairs: 2
+  max_extra_plans: 2
+  enable_rewrite: true
+run:
+  workers: 1          # Ollama serialises anyway; profiling/indexing may use more
+  resume: true
