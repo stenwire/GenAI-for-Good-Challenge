@@ -61,8 +61,8 @@ because **no proof command runs today**: there is no `pyproject.toml`, so
 | 3 | `cd municipal-qa && uv run pytest -q` collects a non-zero number of tests and passes | [ ] |
 | 4 | `cd municipal-qa && uv run ruff check .` passes with no `No Python files found` warning; `uv run ruff format --check .` exits 0 | [ ] |
 | 5 | `cd municipal-qa && uv run mqa --help` lists every command in plan §8 | [x] |
-| 6 | `uv run mqa setup-data` verifies all 188 sources by size and SHA256 against `SourceManifest.csv` | [ ] |
-| 7 | `load_questions` returns 600 Test and 9 Train questions; Train and Test source sets are disjoint | [ ] |
+| 6 | `uv run mqa setup-data` verifies all 188 sources by size and SHA256 against `SourceManifest.csv` | [x] |
+| 7 | `load_questions` returns 600 Test and 9 Train questions; Train and Test source sets are disjoint | [x] |
 | 8 | A placeholder `Submission.md` for all 600 Test IDs passes `uv run mqa validate` | [ ] |
 | 9 | `uv run mqa check-model` reports the configured model with a total parameter count ≤ 3,000,000,000 and its digest | [ ] |
 | 10 | `QuestionBudget` boundary tests pass: 15th call allowed, 16th refused; 12,000 tokens allowed, 12,001 refused | [ ] |

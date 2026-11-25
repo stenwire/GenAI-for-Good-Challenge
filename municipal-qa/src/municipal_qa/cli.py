@@ -14,9 +14,28 @@ def _not_implemented(name: str) -> None:
 
 
 @app.command("setup-data")
-def setup_data() -> None:
+def setup_data(
+    no_hash: Annotated[bool, typer.Option("--no-hash", help="Check sizes only.")] = False,
+) -> None:
     """Extract SourceMaterials.zip and verify every source's size and SHA256."""
-    _not_implemented("setup-data")
+    import time
+
+    from municipal_qa.config import load_config
+    from municipal_qa.data.manifest import DataSetupError, load_manifest
+    from municipal_qa.data.manifest import setup_data as _setup
+
+    cfg = load_config()
+    t0 = time.perf_counter()
+    try:
+        _setup(cfg, verify_hashes=not no_hash)
+    except DataSetupError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(code=1) from e
+    n = len(load_manifest(cfg))
+    checks = "size" if no_hash else "size and SHA256"
+    typer.echo(
+        f"verified {n} sources ({checks}) in {cfg.sources_dir} [{time.perf_counter() - t0:.1f}s]"
+    )
 
 
 @app.command()

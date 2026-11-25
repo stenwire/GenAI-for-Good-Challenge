@@ -224,10 +224,10 @@ __marimo__/
 SourceMaterials.zip
 
 # Challenge data stays local (B-004)
-Data/
+/Data/
 
 # municipal-qa package
 municipal-qa/.venv/
 municipal-qa/artifacts/
 municipal-qa/.env
-Data/sources/
+/Data/sources/
