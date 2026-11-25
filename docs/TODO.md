@@ -68,6 +68,7 @@ build card in `dev/TECHNICAL_PLAN.md` §9 that specifies the task.
 | T-402 | M4 | M8 | Record the user's two final submission choices in `SUBMISSIONS.md`; create `sub-NN-YYYY-MM-DD` tags for them | T-401 | [ ] |
 | T-403 | M4 | M8 | Final README: hardware, runtime, model and digest, parameter count, dependency licences, source licences, exact commands | T-401 | [ ] |
 | T-404 | M4 | M8 | Restructure into the organisers' template repository and entry point | T-403 | [ ] |
+| T-405 | M4 | - | **User-owned, outside `/implement`.** Narrative Application in the IEEE Funding Portal for the chosen use case, Rivne, Ukraine: Energy Advisory AI Assistant (D-031). Due **13 Dec 2026 23:59 EST** (IEEE server clock), same day Zindi closes; both steps are required to move forward to review. Technical Approach is 35% of the panel score (brief §2) and can draw on `dev/TECHNICAL_PLAN.md`. Tick with the user's confirmation that it was submitted. | - | [ ] |
 
 ## Change log
 
@@ -105,6 +106,7 @@ Append only, newest at the bottom. One row per `/implement` run.
 | 2026-11-25 | T-021 | `llm/client.py`: new `_parse_chat_reply` and `_count`. A 200 `/api/chat` reply must be a JSON object with an object `message`, string `content` and non-negative int (or numeric string) token counts; otherwise the call is charged at `num_predict` and raised as `LLMError("... malformed /api/chat reply ...")`. A missing `eval_count` is still charged at `num_predict`. 9 tests added. Resolves B-006 (second verify finding 1). | `pytest tests/test_client.py -v` → 30 passed (8 malformed bodies: list, string, text/negative/float `eval_count`, list `prompt_eval_count`, string `message`, list `content`); against the old client → `8 failed, 22 passed`; verify probe re-run → `200 + JSON list x3 -> calls_used=3 tokens_used=2100 error=LLMError is_LLMError=True`; live `mqa check-model` OK; full suite 130 passed; ruff clean |
 | 2026-11-25 | T-022 | `config.py` `LLMConfig` validators: `options.temperature` must be 0, `options.seed` a fixed integer (not bool or string), `think` false; other options (e.g. `num_ctx`, `top_k`) unrestricted. 9 tests added; missing-key cases load a temp YAML because overrides deep-merge and cannot remove a key (first test draft wrongly used overrides; caught when 2 cases passed a bad config). Second verify finding 2. | `pytest tests/test_config.py -v` → 31 passed; against the old config → `6 failed, 25 passed`; full suite 137 passed; live `mqa check-model` OK; ruff clean |
 | 2026-11-25 | T-023 | Verify checklist RUL-13 pattern narrowed to `(requests|httpx|urllib(\.request|\.error|3)?|aiohttp|socket|http\.client)(\s|$|,)` so `from urllib.parse import ...` is not flagged; known-failure note added to the row. The checklist is under untracked `.claude/`, so the edit is local and not in any commit. All M0 tasks and DoD rows `[x]`: M0 → `awaiting verify`. Second verify finding 3. | Pattern extracted from the checklist row: on `municipal-qa/src` → only `llm/client.py:8:import httpx`; on a probe file with 6 network imports + `from urllib.parse import urlsplit` → 6 matches, parse line not matched; old pattern also flagged `rules.py:4` |
+| 2026-11-25 | M0 complete | Completion gate checked: T-001..T-023 all `[x]`, DoD 1..12 all `[x]`, `/verify` M0 third pass run, `docs/VERIFICATION.md` header re-read immediately before writing: `Milestone: M0 - Foundation`, `Blockers: 0`, `Verdict: PASS`. M0 → `complete`. Third verify report and its TODO rows (T-405, D-031) committed. | `head -11 docs/VERIFICATION.md` → `**Milestone:** M0 - Foundation` / `**Blockers:** 0` / `**Major:** 0` / `**Minor:** 0` / `**Verdict:** PASS`; unchecked M0 DoD rows → 0 |
 
 ## Decisions
 
@@ -142,6 +144,7 @@ a new row that names the old one, never by editing or deleting.
 | D-028 | 2026-11-25 | The model server URL must be loopback (`localhost`, `127.0.0.0/8`, `::1`). A named host such as a Docker service (`ollama:11434`) is refused for now; revisit at T-404 if the organisers' template runs Ollama in a separate container. | Verify finding 4; brief §4.5 / thread 35998 allow no network at inference except the local model server. Allowing arbitrary hostnames would reopen the hole. |
 | D-029 | 2026-11-25 | `notebooks/00_starter.ipynb` is our own environment-check notebook, not a copy of the organiser `StarterNotebook.ipynb` that plan §4 describes. | The organiser notebook is challenge material untracked under D-011, and the local copy carries an absolute data path. The card M1 acceptance (load_config on the `.venv` kernel) needs only our cells. |
 | D-030 | 2026-11-25 | Config requires `temperature == 0`, an integer `seed` (any value, default 42) and `think: false`. | Plan §2/§6.6 reproducibility; any fixed seed reproduces, so only its presence is enforced. Thinking tokens count against the 12,000 budget (brief §4.5). |
+| D-031 | 2026-11-25 | City use case for the Narrative Application: **Rivne, Ukraine: Energy Advisory AI Assistant** (brief §3; `docs/GAI4GC-Cities-Edition-Use-Case-Energy-Advisory-AI-Assistant-Rivne-Ukraine.pdf`). | User reply: "add the narrative application to todo. ukraine was choosen." Brief §2: a team picks exactly one use case. |
 
 ## Blockers
 
@@ -161,3 +164,7 @@ Scope: M0 tasks, DoD rows and touched checklist items; Dimension 1 in full. Run 
 ## Verify run 2026-11-25, second pass (M0 - Foundation)
 
 Scope: M0 tasks T-001..T-020, DoD rows and touched checklist items; Dimension 1 in full (incl. RUL-19); re-check of the first pass. Run audited: none. All 7 first-pass findings confirmed fixed. Verdict **FAIL**: 1 blocker (T-021, B-006), 0 major, 2 minor (T-022, T-023). M0 cannot be marked `complete`. Full report in `docs/VERIFICATION.md`.
+
+## Verify run 2026-11-25, third pass (M0 - Foundation)
+
+Scope: M0 tasks T-001..T-023, DoD rows and touched checklist items; Dimension 1 in full (RUL-01..RUL-19); re-check of the second pass and edge-case probes of code changed since. Run audited: none. All 3 second-pass findings confirmed fixed. Verdict **PASS**: 0 blockers, 0 major, 0 minor. `/implement` may mark M0 `complete` after re-reading the `docs/VERIFICATION.md` header. Also recorded at the user's request: T-405 (Narrative Application, user-owned) and D-031 (Rivne, Ukraine).
