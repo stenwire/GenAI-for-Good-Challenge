@@ -122,3 +122,74 @@ def xlsx_path(tmp_path_factory):
     path = tmp_path_factory.mktemp("xlsx") / "sample.xlsx"
     wb.save(path)
     return path
+
+
+def make_pdf(path, pages: list[str]) -> None:
+    """Minimal valid PDF, one Helvetica text line per page (no PDF library needed)."""
+    objs = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        None,
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    kids = []
+    for text in pages:
+        safe = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        stream = f"BT /F1 12 Tf 72 720 Td ({safe}) Tj ET".encode("latin-1")
+        objs.append(f"<< /Length {len(stream)} >>\nstream\n{stream.decode('latin-1')}\nendstream")
+        content_no = len(objs)
+        objs.append(
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            f"/Resources << /Font << /F1 3 0 R >> >> /Contents {content_no} 0 R >>"
+        )
+        kids.append(f"{len(objs)} 0 R")
+    objs[1] = f"<< /Type /Pages /Kids [{' '.join(kids)}] /Count {len(kids)} >>"
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for i, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n{body}\nendobj\n".encode("latin-1")
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    for off in offsets:
+        out += f"{off:010d} 00000 n \n".encode()
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    path.write_bytes(bytes(out))
+
+
+@pytest.fixture(scope="session")
+def docs_dir(tmp_path_factory):
+    import docx
+
+    d = tmp_path_factory.mktemp("docs")
+    make_pdf(
+        d / "report.pdf",
+        [
+            "Results: share was 12.5 percent [z].",
+            "Methods are described on page two of the report.",
+            "7",
+        ],
+    )
+    (d / "SourceGuide.md").write_text(
+        "# Source guide\n\nUse the frozen files.\nDo not refresh.\n\n"
+        "## Analysis conventions\n\nCounts mean records.\n\n[z] means not applicable.\n"
+    )
+    (d / "Readme.txt").write_text(
+        "==========\nBike data\n==========\n\nIntro line one.\nIntro line two.\n\n"
+        "Field notes\n-----------\n\ncnt: count of rentals\n"
+    )
+    (d / "page.html").write_text(
+        "<html><head><script>var x=1;</script><style>p{}</style></head><body>"
+        "<div id='global-cookie-message'><p>We use cookies</p></div><nav><p>Menu</p></nav>"
+        "<h2>Background</h2><p>Urban centres were mapped.</p>"
+        "<h2>Results</h2><p>Travel time fell.</p><table><tr><th>Zone</th><th>Minutes</th></tr>"
+        "<tr><td>A1</td><td>12</td></tr></table><footer><p>Footer text</p></footer></body></html>"
+    )
+    doc = docx.Document()
+    doc.add_heading("Historical data", level=1)
+    doc.add_paragraph("Specifications changed in 2005.")
+    doc.add_paragraph("Severity is adjusted.")
+    t = doc.add_table(rows=2, cols=2)
+    t.cell(0, 0).text, t.cell(0, 1).text = "Year", "Spec"
+    t.cell(1, 0).text, t.cell(1, 1).text = "2005", "STATS19"
+    doc.save(d / "guide.docx")
+    return d

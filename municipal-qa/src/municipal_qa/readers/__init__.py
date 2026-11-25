@@ -1,3 +1,4 @@
 """Format readers; importing this package registers every reader."""
 
-from municipal_qa.readers import archive, delimited, spreadsheet, sqlite  # noqa: F401
+# Order matters where suffixes are shared: delimited claims tabular .txt before text.
+from municipal_qa.readers import archive, delimited, spreadsheet, sqlite, text  # noqa: F401
