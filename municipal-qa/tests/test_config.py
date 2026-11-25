@@ -129,3 +129,42 @@ def test_non_local_base_url_refused(monkeypatch, no_env, url):
 def test_loopback_base_url_accepted(monkeypatch, no_env, url):
     monkeypatch.setenv("MQA_DATA_DIR", "/d")
     assert load_config(overrides={"llm": {"base_url": url}}, env_file=no_env).llm.base_url == url
+
+
+@pytest.mark.parametrize(
+    ("override", "field"),
+    [
+        ({"llm": {"options": {"temperature": 0.7, "seed": 42, "num_ctx": 8192}}}, "temperature"),
+        ({"llm": {"options": {"temperature": 0, "seed": "42", "num_ctx": 8192}}}, "seed"),
+        ({"llm": {"options": {"temperature": 0, "seed": True, "num_ctx": 8192}}}, "seed"),
+        ({"llm": {"think": True}}, "think"),
+    ],
+)
+def test_non_deterministic_llm_settings_refused(monkeypatch, no_env, override, field):
+    monkeypatch.setenv("MQA_DATA_DIR", "/d")
+    with pytest.raises(ConfigError, match=field):
+        load_config(overrides=override, env_file=no_env)
+
+
+def test_other_seed_and_extra_options_allowed(monkeypatch, no_env):
+    monkeypatch.setenv("MQA_DATA_DIR", "/d")
+    opts = {"temperature": 0, "seed": 7, "num_ctx": 4096, "top_k": 1}
+    assert load_config(overrides={"llm": {"options": opts}}, env_file=no_env).llm.options == opts
+
+
+@pytest.mark.parametrize(
+    ("options_line", "field"),
+    [
+        ("  options: {seed: 42, num_ctx: 8192}", "temperature"),
+        ("  options: {temperature: 0, num_ctx: 8192}", "seed"),
+    ],
+)
+def test_missing_determinism_option_refused(monkeypatch, no_env, tmp_path, options_line, field):
+    monkeypatch.setenv("MQA_DATA_DIR", "/d")
+    text = (PROJECT_ROOT / "configs" / "default.yaml").read_text()
+    original = "  options: {temperature: 0, seed: 42, num_ctx: 8192}"
+    assert original in text
+    cfg_file = tmp_path / "cfg.yaml"
+    cfg_file.write_text(text.replace(original, options_line))
+    with pytest.raises(ConfigError, match=field):
+        load_config(cfg_file, env_file=no_env)

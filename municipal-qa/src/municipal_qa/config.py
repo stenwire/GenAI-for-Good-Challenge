@@ -33,6 +33,22 @@ class LLMConfig(BaseModel):
     keep_alive: str = "10m"
     num_predict: dict[str, int] = Field(default_factory=dict)
 
+    @field_validator("options")
+    @classmethod
+    def _deterministic(cls, v: dict[str, Any]) -> dict[str, Any]:
+        if v.get("temperature") != 0:
+            raise ValueError("options.temperature must be 0 (plan §2 reproducibility)")
+        if isinstance(v.get("seed"), bool) or not isinstance(v.get("seed"), int):
+            raise ValueError("options.seed must be a fixed integer (plan §2 reproducibility)")
+        return v
+
+    @field_validator("think")
+    @classmethod
+    def _no_thinking(cls, v: bool) -> bool:
+        if v:
+            raise ValueError("think must be false; thinking tokens count against the budget")
+        return v
+
     @field_validator("base_url")
     @classmethod
     def _local_only(cls, v: str) -> str:
