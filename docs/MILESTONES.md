@@ -60,7 +60,7 @@ because **no proof command runs today**: there is no `pyproject.toml`, so
 | 2 | `cd municipal-qa && uv run python -c "import sys; print(sys.prefix)"` prints a path inside `municipal-qa/.venv` | [x] |
 | 3 | `cd municipal-qa && uv run pytest -q` collects a non-zero number of tests and passes | [ ] |
 | 4 | `cd municipal-qa && uv run ruff check .` passes with no `No Python files found` warning; `uv run ruff format --check .` exits 0 | [ ] |
-| 5 | `cd municipal-qa && uv run mqa --help` lists every command in plan §8 | [ ] |
+| 5 | `cd municipal-qa && uv run mqa --help` lists every command in plan §8 | [x] |
 | 6 | `uv run mqa setup-data` verifies all 188 sources by size and SHA256 against `SourceManifest.csv` | [ ] |
 | 7 | `load_questions` returns 600 Test and 9 Train questions; Train and Test source sets are disjoint | [ ] |
 | 8 | A placeholder `Submission.md` for all 600 Test IDs passes `uv run mqa validate` | [ ] |
