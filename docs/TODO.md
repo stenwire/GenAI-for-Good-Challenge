@@ -17,7 +17,7 @@ build card in `dev/TECHNICAL_PLAN.md` §9 that specifies the task.
 | ID | Milestone | Card | Task | Dep | State |
 |---|---|---|---|---|---|
 | T-001 | M0 | - | Replace root `LICENSE` (MIT) with the Apache License 2.0 text, copyright holder unchanged (D-002) | - | [x] |
-| T-002 | M0 | - | Extend `.gitignore`: `municipal-qa/.venv/`, `municipal-qa/artifacts/`, `municipal-qa/.env`, `Data/sources/`; prove with `git check-ignore -v` on each path | - | [ ] |
+| T-002 | M0 | - | Extend `.gitignore`: `municipal-qa/.venv/`, `municipal-qa/artifacts/`, `municipal-qa/.env`, `Data/sources/`; prove with `git check-ignore -v` on each path | - | [x] |
 | T-003 | M0 | M1 | `uv init --package --name municipal-qa --python 3.12 municipal-qa`; add plan §3.2 dependencies **except `ifcopenshell`** (D-006); ruff and pytest config from §3.2; `.python-version`; prove the env resolves inside `municipal-qa/.venv`. Resolves B-001. | T-002 | [ ] |
 | T-004 | M0 | M1 | `configs/default.yaml` (plan §6.6), `config.py` with `load_config` expanding `${MQA_DATA_DIR}` from env or `municipal-qa/.env`, `.env.example`, `tests/test_config.py` | T-003 | [ ] |
 | T-005 | M0 | M1 | Typer `cli.py` with every plan §8 command as a stub; `.vscode/settings.json` and `extensions.json` (plan §3.4); `uv run mqa --help` lists all commands | T-004 | [ ] |
@@ -67,6 +67,7 @@ Append only, newest at the bottom. One row per `/implement` run.
 | 2026-11-25 | scaffold | Generated `/implement` and `/verify` skills, `references/checklist.md`, `docs/MILESTONES.md` and `docs/TODO.md` from `dev/TECHNICAL_PLAN.md` and `docs/CHALLENGE_BRIEF.md` | No code exists yet; see B-001. `SourceMaterials.zip` and `sources/` confirmed present in `GenAI-for-Good-Challenge/Data` (outside the repo). |
 | 2026-11-25 | T-001 | Root `LICENSE` replaced with the Apache License 2.0 text (byte-identical to the canonical copy except the appendix line, filled as `Copyright 2026 Stephen Nwankwo`). Branch `m0-foundation` cut from `main`. Found tracked challenge data under repo-root `Data/` in a public repo: B-004, T-013. | `head -3 LICENSE` → `Apache License` / `Version 2.0, January 2004` / `http://www.apache.org/licenses/`; `diff` vs canonical shows only line 179; `grep -c "MIT License" LICENSE` → 0 |
 | 2026-11-25 | T-013 | User chose: untrack `Data/`, keep history. `git rm -r --cached Data`; `Data/` added to `.gitignore`; files kept on disk. B-004 resolved. | `git ls-files Data` → empty; `git check-ignore -v` → `.gitignore:227:Data/` for all 6 files; negative control `git check-ignore -v README.md` → exit 1 |
+| 2026-11-25 | T-002 | `.gitignore` gains `municipal-qa/.venv/`, `municipal-qa/artifacts/`, `municipal-qa/.env`, `Data/sources/`. M0 DoD 11 ticked. | `git check-ignore -v` exit 0 for `.venv/bin/python` (l.230), `artifacts/runs/r1/Submission.md` (l.231), `.env` (l.232), `Data/sources/x.csv` (l.227 `Data/`); negative controls `.env.example`, `src/.../schema.py`, `dev/dev_questions.csv`, `pyproject.toml`, `uv.lock` → exit 1 |
 
 ## Decisions
 
