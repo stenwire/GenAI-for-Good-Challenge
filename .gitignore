@@ -222,3 +222,6 @@ __marimo__/
 
 # Custom
 SourceMaterials.zip
+
+# Challenge data stays local (B-004)
+Data/

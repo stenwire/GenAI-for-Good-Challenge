@@ -28,7 +28,7 @@ build card in `dev/TECHNICAL_PLAN.md` §9 that specifies the task.
 | T-010 | M0 | M6 | `llm/budget.py` `QuestionBudget` with worst-case `can_call`; exact boundary tests (D-007) | T-006 | [ ] |
 | T-011 | M0 | S2 | `llm/client.py` `LLMClient` (`check_model`, `chat`) per card S2, tests with mocked HTTP; `uv run mqa check-model` against a live Ollama | T-010 | [ ] |
 | T-012 | M0 | - | License audit of `uv.lock`: list every package's licence; no copyleft without a Decisions row | T-003 | [ ] |
-| T-013 | M0 | - | User decision on B-004: whether to untrack the repo-root `Data/` challenge files (and whether to purge them from history); then add `Data/` to `.gitignore` | - | [ ] |
+| T-013 | M0 | - | User decision on B-004: whether to untrack the repo-root `Data/` challenge files (and whether to purge them from history); then add `Data/` to `.gitignore` | - | [x] |
 | T-101 | M1 | M3 | `readers/base.py` protocol and registry; `readers/spreadsheet.py` cell-level `.xlsx` and `.ods` with stored and displayed values, merged cells, capped repeats, notes sheets as passages, markers kept as strings; synthetic fixtures in `tests/conftest.py` | T-011 | [ ] |
 | T-102 | M1 | M3 | `readers/delimited.py` (encoding and delimiter sniffing, DuckDB above 50 MB, 1-based data-row locators, WKT detection), `readers/sqlite.py` (read-only URI), `readers/archive.py` (zip members, jpg metadata) | T-101 | [ ] |
 | T-103 | M1 | T1 | `readers/text.py`: pdf (pdfplumber, page numbers, tables), html, docx, md/txt split by headings with line ranges | T-101 | [ ] |
@@ -66,6 +66,7 @@ Append only, newest at the bottom. One row per `/implement` run.
 |---|---|---|---|
 | 2026-11-25 | scaffold | Generated `/implement` and `/verify` skills, `references/checklist.md`, `docs/MILESTONES.md` and `docs/TODO.md` from `dev/TECHNICAL_PLAN.md` and `docs/CHALLENGE_BRIEF.md` | No code exists yet; see B-001. `SourceMaterials.zip` and `sources/` confirmed present in `GenAI-for-Good-Challenge/Data` (outside the repo). |
 | 2026-11-25 | T-001 | Root `LICENSE` replaced with the Apache License 2.0 text (byte-identical to the canonical copy except the appendix line, filled as `Copyright 2026 Stephen Nwankwo`). Branch `m0-foundation` cut from `main`. Found tracked challenge data under repo-root `Data/` in a public repo: B-004, T-013. | `head -3 LICENSE` → `Apache License` / `Version 2.0, January 2004` / `http://www.apache.org/licenses/`; `diff` vs canonical shows only line 179; `grep -c "MIT License" LICENSE` → 0 |
+| 2026-11-25 | T-013 | User chose: untrack `Data/`, keep history. `git rm -r --cached Data`; `Data/` added to `.gitignore`; files kept on disk. B-004 resolved. | `git ls-files Data` → empty; `git check-ignore -v` → `.gitignore:227:Data/` for all 6 files; negative control `git check-ignore -v README.md` → exit 1 |
 
 ## Decisions
 
@@ -84,6 +85,7 @@ a new row that names the old one, never by editing or deleting.
 | D-008 | 2026-11-25 | Test questions and sources may be inspected to decide which generic readers, tools and prompts to build. Prompts and thresholds are still tuned only against dev-set scores, never by reading Test outputs. Resolves the open question in plan §2. | Organiser reply in Zindi thread 35998 (13 Nov 2026) allows building tools from Test inspection; hard-coding and training on Test remain prohibited. |
 | D-009 | 2026-11-25 | The dev set lives at `municipal-qa/dev/`. The repo-root `dev/` keeps the planning documents. | Plan §4 places `dev/` inside the package; the repo root `dev/` already holds `TECHNICAL_PLAN.md`. |
 | D-010 | 2026-11-25 | The copyright holder is kept by filling the Apache 2.0 appendix boilerplate line (`Copyright 2026 Stephen Nwankwo`); the licence body is unmodified canonical text. | T-001 says "copyright holder unchanged"; the appendix line is the standard place for it and leaves the licence text verbatim. |
+| D-011 | 2026-11-25 | Repo-root `Data/` is untracked and ignored; git history is **not** rewritten, so the files remain in commits up to `1b4e510`. | User reply: "untrack Data/ but don't purge history, then continue". |
 
 ## Blockers
 
@@ -92,4 +94,4 @@ a new row that names the old one, never by editing or deleting.
 | B-001 | 2026-11-25 | T-003..T-012 and every proof command | No `municipal-qa/pyproject.toml` exists, so `uv run pytest`, `uv run ruff check .` and `uv run mqa` cannot run. Resolved by T-003. | open |
 | B-002 | 2026-11-25 | T-011 | `ollama list` → `Error: could not connect to ollama server, run 'ollama serve' to start it` (client 0.40.4). The user must start Ollama and run `ollama pull qwen3:1.7b` before `mqa check-model` can be proved. | open |
 | B-003 | 2026-11-25 | T-404 | The organisers' template repository for code review (thread 35998) has not been published. | open |
-| B-004 | 2026-11-25 | T-013 | `Data/AllowedDatasets.csv`, `SampleSubmission.md`, `SourceManifest.csv`, `StarterNotebook.ipynb`, `Test.csv`, `Train.csv` are tracked on `main` (commit `2859d92`) and `origin` is a PUBLIC GitHub repo. Skill rule: never commit challenge data; D-003 places data outside the repo. Untracking or rewriting history needs the user's decision. | open |
+| B-004 | 2026-11-25 | T-013 | `Data/AllowedDatasets.csv`, `SampleSubmission.md`, `SourceManifest.csv`, `StarterNotebook.ipynb`, `Test.csv`, `Train.csv` are tracked on `main` (commit `2859d92`) and `origin` is a PUBLIC GitHub repo. Skill rule: never commit challenge data; D-003 places data outside the repo. Untracking or rewriting history needs the user's decision. | resolved by T-013 (D-011) |
