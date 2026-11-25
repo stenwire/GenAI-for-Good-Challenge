@@ -27,6 +27,8 @@ class RequestNotSent(LLMError):
 
 class LLMClient:
     def __init__(self, cfg: Config, transport: httpx.BaseTransport | None = None):
+        if not rules.is_local_url(cfg.llm.base_url):
+            raise LLMError(f"refusing non-local model server {cfg.llm.base_url!r}")
         self.cfg = cfg
         self.llm = cfg.llm
         self._http = httpx.Client(

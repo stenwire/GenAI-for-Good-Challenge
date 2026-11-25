@@ -232,3 +232,11 @@ def test_rule_cap_holds_even_if_config_is_tampered(cfg):
     cfg.llm.max_params = 8_000_000_000  # assignment skips validation
     with pytest.raises(ModelTooLarge, match="cap 3,000,000,000"):
         _client(cfg, FakeOllama(params=7_615_616_512)).check_model()
+
+
+def test_client_refuses_tampered_remote_base_url(cfg):
+    cfg.llm.base_url = "http://203.0.113.9:11434"  # assignment skips validation
+    fake = FakeOllama()
+    with pytest.raises(LLMError, match="non-local"):
+        _client(cfg, fake)
+    assert fake.requests == []

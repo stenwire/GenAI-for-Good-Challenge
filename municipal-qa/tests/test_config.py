@@ -98,3 +98,34 @@ def test_rule_caps_can_be_tightened(monkeypatch, no_env):
         env_file=no_env,
     )
     assert (cfg.llm.max_params, cfg.budget.max_calls) == (2_000_000_000, 10)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://203.0.113.9:11434",
+        "https://api.example.com",
+        "http://ollama.internal:11434",
+        "http://0.0.0.0:11434",
+        "ftp://127.0.0.1:11434",
+        "127.0.0.1:11434",
+    ],
+)
+def test_non_local_base_url_refused(monkeypatch, no_env, url):
+    monkeypatch.setenv("MQA_DATA_DIR", "/d")
+    with pytest.raises(ConfigError, match="base_url"):
+        load_config(overrides={"llm": {"base_url": url}}, env_file=no_env)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1:11434",
+        "http://localhost:11434",
+        "http://[::1]:11434",
+        "http://127.0.0.2:8080",
+    ],
+)
+def test_loopback_base_url_accepted(monkeypatch, no_env, url):
+    monkeypatch.setenv("MQA_DATA_DIR", "/d")
+    assert load_config(overrides={"llm": {"base_url": url}}, env_file=no_env).llm.base_url == url

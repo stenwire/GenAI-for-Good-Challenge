@@ -33,6 +33,13 @@ class LLMConfig(BaseModel):
     keep_alive: str = "10m"
     num_predict: dict[str, int] = Field(default_factory=dict)
 
+    @field_validator("base_url")
+    @classmethod
+    def _local_only(cls, v: str) -> str:
+        if not rules.is_local_url(v):
+            raise ValueError(f"base_url must point at this machine (loopback), got {v!r}")
+        return v
+
     @field_validator("max_params")
     @classmethod
     def _params_within_rule(cls, v: int) -> int:
