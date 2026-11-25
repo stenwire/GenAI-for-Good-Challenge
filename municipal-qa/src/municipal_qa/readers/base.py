@@ -39,20 +39,22 @@ class Reader(Protocol):
     def load_table(self, src: SourceInfo, table: str | None = None) -> pd.DataFrame: ...
 
 
-_REGISTRY: dict[str, Reader] = {}
+_REGISTRY: dict[str, list[Reader]] = {}
 
 
 def register(reader: Reader) -> Reader:
     for suffix in reader.suffixes:
-        _REGISTRY[suffix.lower()] = reader
+        _REGISTRY.setdefault(suffix.lower(), []).append(reader)
     return reader
 
 
 def get_reader(src: SourceInfo) -> Reader:
-    try:
-        return _REGISTRY[src.suffix.lower()]
-    except KeyError:
-        raise UnsupportedFormat(f"no reader for {src.suffix!r} ({src.source_id})") from None
+    """By suffix; when several readers share one, the first whose `accepts` sniff passes."""
+    for reader in _REGISTRY.get(src.suffix.lower(), []):
+        accepts = getattr(reader, "accepts", None)
+        if accepts is None or accepts(src):
+            return reader
+    raise UnsupportedFormat(f"no reader for {src.suffix!r} ({src.source_id})")
 
 
 def registered_suffixes() -> list[str]:
