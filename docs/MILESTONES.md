@@ -58,8 +58,8 @@ because **no proof command runs today**: there is no `pyproject.toml`, so
 |---|---|---|
 | 1 | Root `LICENSE` is Apache License 2.0 (D-002); `head -3 LICENSE` shows it | [x] |
 | 2 | `cd municipal-qa && uv run python -c "import sys; print(sys.prefix)"` prints a path inside `municipal-qa/.venv` | [x] |
-| 3 | `cd municipal-qa && uv run pytest -q` collects a non-zero number of tests and passes | [ ] |
-| 4 | `cd municipal-qa && uv run ruff check .` passes with no `No Python files found` warning; `uv run ruff format --check .` exits 0 | [ ] |
+| 3 | `cd municipal-qa && uv run pytest -q` collects a non-zero number of tests and passes | [x] |
+| 4 | `cd municipal-qa && uv run ruff check .` passes with no `No Python files found` warning; `uv run ruff format --check .` exits 0 | [x] |
 | 5 | `cd municipal-qa && uv run mqa --help` lists every command in plan §8 | [x] |
 | 6 | `uv run mqa setup-data` verifies all 188 sources by size and SHA256 against `SourceManifest.csv` | [x] |
 | 7 | `load_questions` returns 600 Test and 9 Train questions; Train and Test source sets are disjoint | [x] |
@@ -67,7 +67,7 @@ because **no proof command runs today**: there is no `pyproject.toml`, so
 | 9 | `uv run mqa check-model` reports the configured model with a total parameter count ≤ 3,000,000,000 and its digest | [x] |
 | 10 | `QuestionBudget` boundary tests pass: 15th call allowed, 16th refused; 12,000 tokens allowed, 12,001 refused | [x] |
 | 11 | `.gitignore` covers `municipal-qa/.venv/`, `municipal-qa/artifacts/`, `municipal-qa/.env`, `Data/sources/` | [x] |
-| 12 | No dependency in `uv.lock` is under a strong or weak copyleft licence except where a Decisions row allows it | [ ] |
+| 12 | No dependency in `uv.lock` is under a strong or weak copyleft licence except where a Decisions row allows it | [x] |
 
 ### Verification
 

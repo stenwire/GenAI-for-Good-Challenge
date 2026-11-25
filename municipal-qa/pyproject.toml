@@ -33,7 +33,6 @@ dependencies = [
     "rapidfuzz>=3.14.6",
     "rasterio>=1.5.2",
     "rich>=15.0.0",
-    "sentence-transformers>=6.3.0",
     "shapely>=2.2.0",
     "typer>=0.29.2",
 ]
