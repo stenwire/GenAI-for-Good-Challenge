@@ -91,8 +91,8 @@ but every one of the 600 answers is non-blank and the file is valid.
 |---|---|---|
 | 1 | Train `bus01.ods` cells `BUS01a` H23, T23, H29, T29 read with both stored and displayed values (card M3) | [x] |
 | 2 | HSY `.xlsx` `Tulokset` AA9 returns full precision for `stored` and the formatted string for `displayed` (plan §7.2) | [x] |
-| 3 | Special markers (`[z]`, `[x]`, `[c]`, `..`, `-`) stay strings in every reader, proved by a fixture test | [ ] |
-| 4 | Every `.pdf`, `.md`, `.txt`, `.html`, `.docx`, `.json`, `.xml`, `.xsd` source yields passages with valid locators (card T1) | [ ] |
+| 3 | Special markers (`[z]`, `[x]`, `[c]`, `..`, `-`) stay strings in every reader, proved by a fixture test | [x] |
+| 4 | Every `.pdf`, `.md`, `.txt`, `.html`, `.docx`, `.json`, `.xml`, `.xsd` source yields passages with valid locators (card T1) | [x] |
 | 5 | Scorer returns 1.0 on the Train reference answers and 0.0 on empty answers (card T4) | [ ] |
 | 6 | `municipal-qa/dev/dev_questions.csv` has ≥ 60 rows and `devset_check.py` passes (no Test sources) | [ ] |
 | 7 | `uv run mqa run --split test` completes for all 600 questions with zero blank answers | [ ] |

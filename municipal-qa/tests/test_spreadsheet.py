@@ -252,3 +252,23 @@ def test_all_spreadsheet_sources_read(data_cfg):
         assert reader.passages(src) or prof.tables
     ub = next(s for s in sheets if s.original_file == "Lisa-1-UBN-hoonete-andmesisu-nouded.xlsx")
     assert any(w.startswith("openpyxl:") for w in get_reader(ub).profile(ub).warnings)
+
+
+def test_header_skips_narrow_subtitle_rows_and_marker_runs(tmp_path):
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Table_1"
+    ws.append(["Table 1: Gas consumption"])
+    ws.append(["Table 1a: Number", None, None, "Table 1b: Mean"])
+    ws.append(["Year", "50 or less", "51 - 100", "101 - 150", "Over 200"])
+    for code in ["[x]", "[z]", "..", "-", "[c]"]:
+        ws.append(["2004", code, code, code, code])
+    ws.append(["2005", 210730, 1395970, 744990, 28220])
+    path = tmp_path / "need.xlsx"
+    wb.save(path)
+    assert detect_header_row(read_cells(path)["Table_1"]) == 3
+    df = sheet_frame(path, "Table_1")
+    assert list(df.columns) == ["Year", "50 or less", "51 - 100", "101 - 150", "Over 200"]
+    assert df.loc[4, "50 or less"] == "[x]"

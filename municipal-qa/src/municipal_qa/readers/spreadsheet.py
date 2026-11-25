@@ -306,14 +306,21 @@ def _is_number(v: object) -> bool:
 
 
 def detect_header_row(cells: list[Cell]) -> int | None:
+    """First all-text row of 2+ cells, as wide as the data under it, with numbers below.
+
+    A run of text markers such as `[z]` must not be taken for the header row.
+    """
     rows = _rows(cells)
     nums = list(rows)
     for i, r in enumerate(nums[:60]):
         row = rows[r]
         if len(row) < 2 or not all(isinstance(c.stored, str) for c in row):
             continue
-        following = nums[i + 1 : i + 4]
-        if any(any(_is_number(c.stored) for c in rows[n]) for n in following):
+        below = nums[i + 1 : i + 51]
+        if not any(any(_is_number(c.stored) for c in rows[n]) for n in below):
+            continue
+        widest = max((len(rows[n]) for n in below), default=0)
+        if len(row) >= 0.5 * widest:
             return r
     for r in nums[:60]:
         if len(rows[r]) >= 2:
