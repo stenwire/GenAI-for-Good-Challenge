@@ -64,7 +64,7 @@ because **no proof command runs today**: there is no `pyproject.toml`, so
 | 6 | `uv run mqa setup-data` verifies all 188 sources by size and SHA256 against `SourceManifest.csv` | [x] |
 | 7 | `load_questions` returns 600 Test and 9 Train questions; Train and Test source sets are disjoint | [x] |
 | 8 | A placeholder `Submission.md` for all 600 Test IDs passes `uv run mqa validate` | [x] |
-| 9 | `uv run mqa check-model` reports the configured model with a total parameter count ≤ 3,000,000,000 and its digest | [ ] |
+| 9 | `uv run mqa check-model` reports the configured model with a total parameter count ≤ 3,000,000,000 and its digest | [x] |
 | 10 | `QuestionBudget` boundary tests pass: 15th call allowed, 16th refused; 12,000 tokens allowed, 12,001 refused | [x] |
 | 11 | `.gitignore` covers `municipal-qa/.venv/`, `municipal-qa/artifacts/`, `municipal-qa/.env`, `Data/sources/` | [x] |
 | 12 | No dependency in `uv.lock` is under a strong or weak copyleft licence except where a Decisions row allows it | [ ] |
