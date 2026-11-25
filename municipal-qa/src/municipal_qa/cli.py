@@ -84,7 +84,29 @@ def submit(run_id: str) -> None:
 @app.command()
 def validate(path: Path) -> None:
     """Validate any submission file."""
-    _not_implemented("validate")
+    from municipal_qa.config import load_config
+    from municipal_qa.data.manifest import load_manifest
+    from municipal_qa.data.questions import load_questions
+    from municipal_qa.submission.validator import validate_submission
+
+    cfg = load_config()
+    test = load_questions(cfg, "test")
+    warnings: list[str] = []
+    problems = validate_submission(
+        path,
+        [q.id for q in test],
+        {q.id: q.source_ids for q in test},
+        set(load_manifest(cfg)),
+        warnings,
+    )
+    if warnings:
+        typer.echo(f"{len(warnings)} warning(s), e.g. {warnings[0]}")
+    for p in problems:
+        typer.echo(f"problem: {p}", err=True)
+    if problems:
+        typer.echo(f"INVALID: {len(problems)} problem(s) in {path}")
+        raise typer.Exit(code=1)
+    typer.echo(f"valid: {len(test)} Test IDs in order, {path.stat().st_size:,} bytes")
 
 
 @app.command()
