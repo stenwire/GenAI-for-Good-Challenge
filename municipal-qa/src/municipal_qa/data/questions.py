@@ -12,7 +12,7 @@ from municipal_qa.schema import Question
 DEV_QUESTIONS = PROJECT_ROOT / "dev" / "dev_questions.csv"
 
 
-def _path(cfg: Config, split: str) -> Path:
+def questions_path(cfg: Config, split: str) -> Path:
     if split == "train":
         return cfg.data_dir / "Train.csv"
     if split == "test":
@@ -23,7 +23,7 @@ def _path(cfg: Config, split: str) -> Path:
 
 
 def load_questions(cfg: Config, split: Literal["train", "dev", "test"]) -> list[Question]:
-    df = pd.read_csv(_path(cfg, split), dtype=str, keep_default_na=False)
+    df = pd.read_csv(questions_path(cfg, split), dtype=str, keep_default_na=False)
     out = []
     for r in df.to_dict("records"):
         out.append(

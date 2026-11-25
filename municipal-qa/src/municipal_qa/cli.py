@@ -84,9 +84,30 @@ def run(
 
 
 @app.command()
-def evaluate(run_id: str) -> None:
+def evaluate(
+    run_id: str,
+    split: Annotated[
+        str | None, typer.Option(help="Override the split recorded in run_manifest.json.")
+    ] = None,
+) -> None:
     """Score a dev run per domain and question type."""
-    _not_implemented("evaluate")
+    import json
+
+    from municipal_qa.config import load_config
+    from municipal_qa.evaluation.report import render
+    from municipal_qa.evaluation.scorer import evaluate_run
+
+    cfg = load_config()
+    run_dir = cfg.artifacts_dir / "runs" / run_id
+    if not (run_dir / "answers.jsonl").exists():
+        typer.echo(f"no answers.jsonl in {run_dir}", err=True)
+        raise typer.Exit(code=1)
+    manifest = run_dir / "run_manifest.json"
+    if split is None and manifest.exists():
+        split = json.loads(manifest.read_text()).get("split")
+    split = split or "dev"
+    typer.echo(f"# Evaluation of {run_id} ({split})\n")
+    typer.echo(render(evaluate_run(run_dir, split, cfg)))
 
 
 @app.command()
