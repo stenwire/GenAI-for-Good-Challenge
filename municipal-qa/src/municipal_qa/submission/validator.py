@@ -106,9 +106,8 @@ def validate_submission(
                 problems.append(f"{b.qid}: malformed evidence line {line[:80]!r}")
                 continue
             sid = line[2:18]
-            if allowed is not None and sid not in allowed:
-                if manifest_ids is not None and sid not in manifest_ids:
-                    problems.append(f"{b.qid}: cites unknown source {sid}")
-                else:
-                    warn.append(f"{b.qid}: cites {sid}, not in its Source_IDs")
+            if manifest_ids is not None and sid not in manifest_ids:
+                problems.append(f"{b.qid}: cites unknown source {sid}")
+            elif allowed is not None and sid not in allowed:
+                warn.append(f"{b.qid}: cites {sid}, not in its Source_IDs")
     return problems

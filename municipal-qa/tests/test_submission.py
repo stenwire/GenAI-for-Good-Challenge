@@ -132,17 +132,18 @@ def test_non_utf8_rejected(tmp_path):
     assert validate_submission(bad, IDS) and "UTF-8" in validate_submission(bad, IDS)[0]
 
 
+MANIFEST = {"SRC_aaaaaaaaaaaa", "SRC_bbbbbbbbbbbb", "SRC_cccccccccccc"}
+
+
 def test_foreign_source_is_warning_unknown_is_error(tmp_path):
     t = _good_text(tmp_path).replace("SRC_cccccccccccc | reference", "SRC_aaaaaaaaaaaa | reference")
     p = tmp_path / "w.md"
     p.write_text(t, encoding="utf-8")
     warns: list[str] = []
-    assert validate_submission(p, IDS, SRC, {"SRC_aaaaaaaaaaaa"}, warns) == []
+    assert validate_submission(p, IDS, SRC, MANIFEST, warns) == []
     assert any("not in its Source_IDs" in w for w in warns)
     p.write_text(t.replace("SRC_aaaaaaaaaaaa | reference", "SRC_dddddddddddd | reference"))
-    assert any(
-        "unknown source" in x for x in validate_submission(p, IDS, SRC, {"SRC_aaaaaaaaaaaa"})
-    )
+    assert any("unknown source" in x for x in validate_submission(p, IDS, SRC, MANIFEST))
 
 
 def test_placeholder_record_is_valid(tmp_path):
@@ -170,3 +171,14 @@ def test_placeholder_for_all_600_test_ids(data_cfg, tmp_path):
     result = CliRunner().invoke(app, ["validate", str(out)])
     assert result.exit_code == 0, result.output
     assert "valid" in result.output
+
+
+def test_unknown_source_caught_without_per_question_lists(tmp_path):
+    good = tmp_path / "g.md"
+    good.write_text(_good_text(tmp_path), encoding="utf-8")
+    manifest = {"SRC_aaaaaaaaaaaa", "SRC_bbbbbbbbbbbb", "SRC_cccccccccccc"}
+    assert validate_submission(good, IDS, manifest_ids=manifest) == []
+    bad = tmp_path / "b.md"
+    bad.write_text(_good_text(tmp_path).replace("SRC_cccccccccccc", "SRC_dddddddddddd"))
+    problems = validate_submission(bad, IDS, manifest_ids=manifest)
+    assert problems == ["0c-3: cites unknown source SRC_dddddddddddd"]
