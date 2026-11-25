@@ -5,7 +5,7 @@ import pytest
 
 from municipal_qa.config import load_config
 from municipal_qa.llm.budget import BudgetExceeded, QuestionBudget
-from municipal_qa.llm.client import LLMClient, LLMError, ModelTooLarge
+from municipal_qa.llm.client import LLMClient, LLMError, ModelTooLarge, RequestNotSent
 
 STARTER_COUNT = 2_031_739_904
 
@@ -158,3 +158,71 @@ def test_invalid_json_returned_raw_and_counted(cfg):
 def test_unknown_purpose_rejected(cfg):
     with pytest.raises(ValueError, match="purpose"):
         _client(cfg, FakeOllama()).chat([], "summarise", QuestionBudget())
+
+
+def _failing_chat(kind):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/show":
+            return httpx.Response(200, json={"model_info": {"general.parameter_count": 1}})
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": []})
+        if kind == "500":
+            return httpx.Response(500, text="runner crashed")
+        if kind == "nojson":
+            return httpx.Response(200, text="<html>proxy</html>")
+        if kind == "no_eval":
+            return httpx.Response(200, json={"message": {"content": "x"}})
+        if kind == "timeout":
+            raise httpx.ReadTimeout("still generating", request=request)
+        raise httpx.RemoteProtocolError("connection dropped mid-response", request=request)
+
+    return handler
+
+
+@pytest.mark.parametrize("kind", ["500", "timeout", "protocol", "nojson"])
+def test_failure_after_sending_is_charged_at_worst_case(cfg, kind):
+    budget = QuestionBudget()
+    client = LLMClient(cfg, transport=httpx.MockTransport(_failing_chat(kind)))
+    with pytest.raises(LLMError):
+        client.chat([{"role": "user", "content": "x"}], "plan", budget)
+    assert (budget.calls_used, budget.tokens_used) == (1, 700)
+    assert budget.records()[0].purpose == "plan"
+
+
+def test_missing_eval_count_is_charged_at_worst_case(cfg):
+    budget = QuestionBudget()
+    client = LLMClient(cfg, transport=httpx.MockTransport(_failing_chat("no_eval")))
+    client.chat([{"role": "user", "content": "x"}], "compose", budget)
+    assert (budget.calls_used, budget.tokens_used) == (1, 600)
+
+
+def test_retry_loop_after_failures_stops_at_the_caps(cfg):
+    budget = QuestionBudget()
+    client = LLMClient(cfg, transport=httpx.MockTransport(_failing_chat("timeout")))
+    sent = 0
+    for _ in range(40):
+        try:
+            client.chat([{"role": "user", "content": "x"}], "plan", budget)
+        except BudgetExceeded:
+            break
+        except LLMError:
+            sent += 1
+    assert sent == 15  # 12,000 // 700 = 17 by tokens, 15 by calls
+    assert budget.calls_used == 15 and budget.tokens_used <= 12000
+
+
+def test_unreachable_server_is_not_charged(cfg, monkeypatch):
+    monkeypatch.setattr("municipal_qa.llm.client.time.sleep", lambda s: None)
+    client = _client(cfg, FakeOllama())
+    client.check_model()
+    budget = QuestionBudget()
+
+    def refuse(request):
+        raise httpx.ConnectError("refused", request=request)
+
+    client._http = httpx.Client(
+        base_url="http://127.0.0.1:11434", transport=httpx.MockTransport(refuse)
+    )
+    with pytest.raises(RequestNotSent):
+        client.chat([{"role": "user", "content": "x"}], "plan", budget)
+    assert budget.calls_used == 0

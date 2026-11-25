@@ -20,6 +20,10 @@ class LLMError(Exception): ...
 class ModelTooLarge(LLMError): ...
 
 
+class RequestNotSent(LLMError):
+    """No connection was made, so the model cannot have generated anything."""
+
+
 class LLMClient:
     def __init__(self, cfg: Config, transport: httpx.BaseTransport | None = None):
         self.cfg = cfg
@@ -39,11 +43,16 @@ class LLMClient:
                 break
             except (httpx.ConnectError, httpx.ConnectTimeout) as e:
                 if attempt == MAX_CONNECT_RETRIES:
-                    raise LLMError(f"cannot reach Ollama at {self.llm.base_url}: {e}") from e
+                    raise RequestNotSent(f"cannot reach Ollama at {self.llm.base_url}: {e}") from e
                 time.sleep(0.5 * (attempt + 1))
+            except httpx.HTTPError as e:
+                raise LLMError(f"POST {path} failed after sending: {e!r}") from e
         if resp.status_code != 200:
             raise LLMError(f"POST {path} -> HTTP {resp.status_code}: {resp.text[:300]}")
-        return resp.json()
+        try:
+            return resp.json()
+        except ValueError as e:
+            raise LLMError(f"POST {path} returned non-JSON: {resp.text[:300]}") from e
 
     def check_model(self) -> dict:
         """Name, digest and total parameter count; raises if above `max_params` or unknown."""
@@ -101,13 +110,21 @@ class LLMClient:
         if json_schema is not None:
             payload["format"] = json_schema
         t0 = time.perf_counter()
-        data = self._post("/api/chat", payload)
+        try:
+            data = self._post("/api/chat", payload)
+        except RequestNotSent:
+            raise
+        except LLMError:
+            # The request may have reached the model: charge the worst case.
+            budget.record(purpose, 0, num_predict, int((time.perf_counter() - t0) * 1000))
+            raise
         elapsed = int((time.perf_counter() - t0) * 1000)
-        # Invalid JSON is returned as raw text; the caller decides whether to retry.
+        eval_count = data.get("eval_count")
+        # Invalid JSON in the content is returned raw; the caller decides whether to retry.
         budget.record(
             purpose,
             int(data.get("prompt_eval_count") or 0),
-            int(data.get("eval_count") or 0),
+            num_predict if eval_count is None else int(eval_count),
             elapsed,
         )
         text = (data.get("message") or {}).get("content") or ""
