@@ -57,7 +57,7 @@ because **no proof command runs today**: there is no `pyproject.toml`, so
 | # | Criterion | State |
 |---|---|---|
 | 1 | Root `LICENSE` is Apache License 2.0 (D-002); `head -3 LICENSE` shows it | [x] |
-| 2 | `cd municipal-qa && uv run python -c "import sys; print(sys.prefix)"` prints a path inside `municipal-qa/.venv` | [ ] |
+| 2 | `cd municipal-qa && uv run python -c "import sys; print(sys.prefix)"` prints a path inside `municipal-qa/.venv` | [x] |
 | 3 | `cd municipal-qa && uv run pytest -q` collects a non-zero number of tests and passes | [ ] |
 | 4 | `cd municipal-qa && uv run ruff check .` passes with no `No Python files found` warning; `uv run ruff format --check .` exits 0 | [ ] |
 | 5 | `cd municipal-qa && uv run mqa --help` lists every command in plan §8 | [ ] |

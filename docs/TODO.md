@@ -18,7 +18,7 @@ build card in `dev/TECHNICAL_PLAN.md` §9 that specifies the task.
 |---|---|---|---|---|---|
 | T-001 | M0 | - | Replace root `LICENSE` (MIT) with the Apache License 2.0 text, copyright holder unchanged (D-002) | - | [x] |
 | T-002 | M0 | - | Extend `.gitignore`: `municipal-qa/.venv/`, `municipal-qa/artifacts/`, `municipal-qa/.env`, `Data/sources/`; prove with `git check-ignore -v` on each path | - | [x] |
-| T-003 | M0 | M1 | `uv init --package --name municipal-qa --python 3.12 municipal-qa`; add plan §3.2 dependencies **except `ifcopenshell`** (D-006); ruff and pytest config from §3.2; `.python-version`; prove the env resolves inside `municipal-qa/.venv`. Resolves B-001. | T-002 | [ ] |
+| T-003 | M0 | M1 | `uv init --package --name municipal-qa --python 3.12 municipal-qa`; add plan §3.2 dependencies **except `ifcopenshell`** (D-006); ruff and pytest config from §3.2; `.python-version`; prove the env resolves inside `municipal-qa/.venv`. Resolves B-001. | T-002 | [x] |
 | T-004 | M0 | M1 | `configs/default.yaml` (plan §6.6), `config.py` with `load_config` expanding `${MQA_DATA_DIR}` from env or `municipal-qa/.env`, `.env.example`, `tests/test_config.py` | T-003 | [ ] |
 | T-005 | M0 | M1 | Typer `cli.py` with every plan §8 command as a stub; `.vscode/settings.json` and `extensions.json` (plan §3.4); `uv run mqa --help` lists all commands | T-004 | [ ] |
 | T-006 | M0 | S1 | `schema.py` exactly as plan §5 | T-003 | [ ] |
@@ -68,6 +68,7 @@ Append only, newest at the bottom. One row per `/implement` run.
 | 2026-11-25 | T-001 | Root `LICENSE` replaced with the Apache License 2.0 text (byte-identical to the canonical copy except the appendix line, filled as `Copyright 2026 Stephen Nwankwo`). Branch `m0-foundation` cut from `main`. Found tracked challenge data under repo-root `Data/` in a public repo: B-004, T-013. | `head -3 LICENSE` → `Apache License` / `Version 2.0, January 2004` / `http://www.apache.org/licenses/`; `diff` vs canonical shows only line 179; `grep -c "MIT License" LICENSE` → 0 |
 | 2026-11-25 | T-013 | User chose: untrack `Data/`, keep history. `git rm -r --cached Data`; `Data/` added to `.gitignore`; files kept on disk. B-004 resolved. | `git ls-files Data` → empty; `git check-ignore -v` → `.gitignore:227:Data/` for all 6 files; negative control `git check-ignore -v README.md` → exit 1 |
 | 2026-11-25 | T-002 | `.gitignore` gains `municipal-qa/.venv/`, `municipal-qa/artifacts/`, `municipal-qa/.env`, `Data/sources/`. M0 DoD 11 ticked. | `git check-ignore -v` exit 0 for `.venv/bin/python` (l.230), `artifacts/runs/r1/Submission.md` (l.231), `.env` (l.232), `Data/sources/x.csv` (l.227 `Data/`); negative controls `.env.example`, `src/.../schema.py`, `dev/dev_questions.csv`, `pyproject.toml`, `uv.lock` → exit 1 |
+| 2026-11-25 | T-003 | `uv init --package --no-workspace` created `municipal-qa/` (Python 3.12 pinned); plan §3.2 deps added except `ifcopenshell` (D-006), `tqdm` (D-012), `odfpy` (D-013); `python-dotenv` added (D-014); `mqa` script, ruff and pytest config per §3.2; licence `Apache-2.0` in metadata. First `uv init` attached the package to a uv workspace in the parent folder outside the repo; that edit was reverted (D-015). B-001 resolved. M0 DoD 2 ticked. | `uv run python -c "import sys; print(sys.prefix)"` → `.../GenAI-for-Good-Challenge/municipal-qa/.venv`; import of `municipal_qa`, pandas, duckdb, geopandas, rasterio, laspy, lazrs, bm25s, sentence_transformers ok; `.python-version` → 3.12; `ifcopenshell`/`odfpy`/`tqdm` absent from `pyproject.toml` |
 
 ## Decisions
 
@@ -87,12 +88,16 @@ a new row that names the old one, never by editing or deleting.
 | D-009 | 2026-11-25 | The dev set lives at `municipal-qa/dev/`. The repo-root `dev/` keeps the planning documents. | Plan §4 places `dev/` inside the package; the repo root `dev/` already holds `TECHNICAL_PLAN.md`. |
 | D-010 | 2026-11-25 | The copyright holder is kept by filling the Apache 2.0 appendix boilerplate line (`Copyright 2026 Stephen Nwankwo`); the licence body is unmodified canonical text. | T-001 says "copyright holder unchanged"; the appendix line is the standard place for it and leaves the licence text verbatim. |
 | D-011 | 2026-11-25 | Repo-root `Data/` is untracked and ignored; git history is **not** rewritten, so the files remain in commits up to `1b4e510`. | User reply: "untrack Data/ but don't purge history, then continue". |
+| D-012 | 2026-11-25 | `tqdm` is not a direct dependency; progress display uses `rich.progress`. | PyPI licence `MPL-2.0 AND MIT`; MPL-2.0 is weak copyleft. It may still arrive transitively (T-012 audits that). |
+| D-013 | 2026-11-25 | `odfpy` is not a dependency. `.ods` is read by parsing `content.xml` with `lxml` (`office:value` = stored, `text:p` = displayed). | `odfpy` is tri-licensed Apache/GPL/LGPL; parsing ODS XML directly also exposes repeated columns and displayed text exactly as plan §7.2 needs. |
+| D-014 | 2026-11-25 | `python-dotenv` (BSD-3-Clause) added to load `municipal-qa/.env`. | Card M1 names it as the `.env` loader option. |
+| D-015 | 2026-11-25 | `uv init` uses `--no-workspace`. | Plain `uv init` found a `pyproject.toml` in the folder above the repo and registered `municipal-qa` as its workspace member, editing a file outside the repo. That edit was removed; the package must resolve standalone on a clean clone. |
 
 ## Blockers
 
 | ID | Date | Blocks | Blocker | State |
 |---|---|---|---|---|
-| B-001 | 2026-11-25 | T-003..T-012 and every proof command | No `municipal-qa/pyproject.toml` exists, so `uv run pytest`, `uv run ruff check .` and `uv run mqa` cannot run. Resolved by T-003. | open |
+| B-001 | 2026-11-25 | T-003..T-012 and every proof command | No `municipal-qa/pyproject.toml` exists, so `uv run pytest`, `uv run ruff check .` and `uv run mqa` cannot run. Resolved by T-003. | resolved by T-003 |
 | B-002 | 2026-11-25 | T-011 | `ollama list` → `Error: could not connect to ollama server, run 'ollama serve' to start it` (client 0.40.4). The user must start Ollama and run `ollama pull qwen3:1.7b` before `mqa check-model` can be proved. | open |
 | B-003 | 2026-11-25 | T-404 | The organisers' template repository for code review (thread 35998) has not been published. | open |
 | B-004 | 2026-11-25 | T-013 | `Data/AllowedDatasets.csv`, `SampleSubmission.md`, `SourceManifest.csv`, `StarterNotebook.ipynb`, `Test.csv`, `Train.csv` are tracked on `main` (commit `2859d92`) and `origin` is a PUBLIC GitHub repo. Skill rule: never commit challenge data; D-003 places data outside the repo. Untracking or rewriting history needs the user's decision. | resolved by T-013 (D-011) |
