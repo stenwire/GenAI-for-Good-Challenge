@@ -121,16 +121,39 @@ class LLMClient:
             budget.record(purpose, 0, num_predict, int((time.perf_counter() - t0) * 1000))
             raise
         elapsed = int((time.perf_counter() - t0) * 1000)
-        eval_count = data.get("eval_count")
+        try:
+            prompt_tokens, generated, text = _parse_chat_reply(data, num_predict)
+        except (TypeError, ValueError) as e:
+            budget.record(purpose, 0, num_predict, elapsed)
+            raise LLMError(f"{purpose}: malformed /api/chat reply: {e}") from e
         # Invalid JSON in the content is returned raw; the caller decides whether to retry.
-        budget.record(
-            purpose,
-            int(data.get("prompt_eval_count") or 0),
-            num_predict if eval_count is None else int(eval_count),
-            elapsed,
-        )
-        text = (data.get("message") or {}).get("content") or ""
+        budget.record(purpose, prompt_tokens, generated, elapsed)
         return text, budget.records()[-1]
 
     def close(self) -> None:
         self._http.close()
+
+
+def _count(value: Any, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int | str):
+        raise TypeError(f"{name} is {type(value).__name__}")
+    n = int(value)
+    if n < 0:
+        raise ValueError(f"{name} is negative")
+    return n
+
+
+def _parse_chat_reply(data: Any, num_predict: int) -> tuple[int, int, str]:
+    """(prompt_tokens, generated_tokens, text); a missing eval_count is charged as num_predict."""
+    if not isinstance(data, dict):
+        raise TypeError(f"reply is {type(data).__name__}, not a JSON object")
+    message = data.get("message") or {}
+    if not isinstance(message, dict):
+        raise TypeError("message is not an object")
+    text = message.get("content") or ""
+    if not isinstance(text, str):
+        raise TypeError("message.content is not a string")
+    eval_count = data.get("eval_count")
+    generated = num_predict if eval_count is None else _count(eval_count, "eval_count")
+    prompt_tokens = _count(data.get("prompt_eval_count") or 0, "prompt_eval_count")
+    return prompt_tokens, generated, text

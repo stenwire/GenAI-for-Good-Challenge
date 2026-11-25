@@ -240,3 +240,49 @@ def test_client_refuses_tampered_remote_base_url(cfg):
     with pytest.raises(LLMError, match="non-local"):
         _client(cfg, fake)
     assert fake.requests == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        ["unexpected", "list"],
+        "just a string",
+        {"message": {"content": "x"}, "eval_count": "many"},
+        {"message": {"content": "x"}, "eval_count": -5},
+        {"message": {"content": "x"}, "eval_count": 3.5},
+        {"message": {"content": "x"}, "eval_count": 10, "prompt_eval_count": [1]},
+        {"message": "not an object", "eval_count": 10},
+        {"message": {"content": ["not", "text"]}, "eval_count": 10},
+    ],
+    ids=[
+        "list",
+        "string",
+        "eval-text",
+        "eval-negative",
+        "eval-float",
+        "prompt-list",
+        "message-str",
+        "content-list",
+    ],
+)
+def test_malformed_200_reply_is_charged_at_worst_case(cfg, body):
+    def handler(request):
+        if request.url.path == "/api/show":
+            return httpx.Response(200, json={"model_info": {"general.parameter_count": 1}})
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": []})
+        return httpx.Response(200, json=body)
+
+    budget = QuestionBudget()
+    client = LLMClient(cfg, transport=httpx.MockTransport(handler))
+    with pytest.raises(LLMError, match="malformed"):
+        client.chat([{"role": "user", "content": "x"}], "plan", budget)
+    assert (budget.calls_used, budget.tokens_used) == (1, 700)
+
+
+def test_well_formed_reply_charges_reported_tokens(cfg):
+    fake = FakeOllama()
+    budget = QuestionBudget()
+    client = _client(cfg, fake)
+    client.chat([{"role": "user", "content": "x"}], "route", budget)
+    assert budget.tokens_used == 42
