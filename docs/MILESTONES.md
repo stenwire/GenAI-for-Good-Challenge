@@ -26,7 +26,7 @@ Hard external dates (from the brief, not movable):
 | Milestone | Name | Plan cards | Target | Depends on | Status |
 |---|---|---|---|---|---|
 | M0 | Foundation | M1, M2, M6, M7, S1, S2 | 27 Nov 2026 | - | complete |
-| M1 | Baseline Submission | M3, T1, T4, S5 (basic), T3 (≥ 60) | 30 Nov 2026 | M0 | in progress |
+| M1 | Baseline Submission | M3, T1, T4, S5 (basic), T3 (≥ 60) | 30 Nov 2026 | M0 | awaiting verify |
 | M2 | Tools and Planner | M4, M5, T2, T3 (≥ 90), S3, S4 | 5 Dec 2026 | M1 | not started |
 | M3 | Feature Freeze | S5 (complete), M8 (draft) | 9 Dec 2026 | M2 | not started |
 | M4 | Final Package | M8 | 12 Dec 2026 | M3 | not started |
@@ -95,10 +95,10 @@ but every one of the 600 answers is non-blank and the file is valid.
 | 4 | Every `.pdf`, `.md`, `.txt`, `.html`, `.docx`, `.json`, `.xml`, `.xsd` source yields passages with valid locators (card T1) | [x] |
 | 5 | Scorer returns 1.0 on the Train reference answers and 0.0 on empty answers (card T4) | [x] |
 | 6 | `municipal-qa/dev/dev_questions.csv` has ≥ 60 rows and `devset_check.py` passes (no Test sources) | [x] |
-| 7 | `uv run mqa run --split test` completes for all 600 questions with zero blank answers | [ ] |
-| 8 | `uv run mqa validate` on that run's `Submission.md` reports no problems | [ ] |
-| 9 | That run's `budget.csv` shows max calls ≤ 15 and max generated tokens ≤ 12,000 | [ ] |
-| 10 | `SUBMISSIONS.md` has a row for the run (date, tag, run ID, dev score; leaderboard score filled in when the user reports it) | [ ] |
+| 7 | `uv run mqa run --split test` completes for all 600 questions with zero blank answers | [x] |
+| 8 | `uv run mqa validate` on that run's `Submission.md` reports no problems | [x] |
+| 9 | That run's `budget.csv` shows max calls ≤ 15 and max generated tokens ≤ 12,000 | [x] |
+| 10 | `SUBMISSIONS.md` has a row for the run (date, tag, run ID, dev score; leaderboard score filled in when the user reports it) | [x] |
 
 ### Verification
 
