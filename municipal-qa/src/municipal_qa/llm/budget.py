@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from municipal_qa import rules
 from municipal_qa.schema import CallRecord
 
 
@@ -9,7 +10,17 @@ class BudgetExceeded(Exception): ...
 class QuestionBudget:
     """Per-question cap on model calls and generated tokens (thinking, retries, checks included)."""
 
-    def __init__(self, max_calls: int = 15, max_tokens: int = 12000):
+    def __init__(
+        self,
+        max_calls: int = rules.MAX_CALLS_PER_QUESTION,
+        max_tokens: int = rules.MAX_GENERATED_TOKENS_PER_QUESTION,
+    ):
+        if not 0 < max_calls <= rules.MAX_CALLS_PER_QUESTION:
+            raise ValueError(f"max_calls {max_calls} outside 1..{rules.MAX_CALLS_PER_QUESTION}")
+        if not 0 < max_tokens <= rules.MAX_GENERATED_TOKENS_PER_QUESTION:
+            raise ValueError(
+                f"max_tokens {max_tokens} outside 1..{rules.MAX_GENERATED_TOKENS_PER_QUESTION}"
+            )
         self.max_calls = max_calls
         self.max_tokens = max_tokens
         self._records: list[CallRecord] = []

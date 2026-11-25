@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 
+from municipal_qa import rules
 from municipal_qa.config import Config
 from municipal_qa.llm.budget import BudgetExceeded, QuestionBudget
 from municipal_qa.schema import CallRecord
@@ -61,10 +62,9 @@ class LLMClient:
         count = info.get("general.parameter_count")
         if not isinstance(count, int) or count <= 0:
             raise ModelTooLarge(f"{self.llm.model}: total parameter count not reported")
-        if count > self.llm.max_params:
-            raise ModelTooLarge(
-                f"{self.llm.model}: {count:,} parameters > cap {self.llm.max_params:,}"
-            )
+        cap = min(self.llm.max_params, rules.MAX_TOTAL_PARAMS)
+        if count > cap:
+            raise ModelTooLarge(f"{self.llm.model}: {count:,} parameters > cap {cap:,}")
         digest = None
         try:
             resp = self._http.get("/api/tags")
@@ -77,7 +77,7 @@ class LLMClient:
             "name": self.llm.model,
             "digest": digest,
             "parameter_count": count,
-            "max_params": self.llm.max_params,
+            "max_params": cap,
             "quantization": (show.get("details") or {}).get("quantization_level"),
         }
         return self._model_info

@@ -64,3 +64,9 @@ def test_records_are_call_records_and_a_copy():
     }
     recs.clear()
     assert b.calls_used == 1
+
+
+@pytest.mark.parametrize(("calls", "tokens"), [(16, 12000), (15, 12001), (0, 100), (5, 0)])
+def test_budget_cannot_exceed_rule_caps(calls, tokens):
+    with pytest.raises(ValueError):
+        QuestionBudget(max_calls=calls, max_tokens=tokens)

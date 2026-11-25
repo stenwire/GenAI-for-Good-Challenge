@@ -72,3 +72,29 @@ def test_relative_path_resolves_from_any_cwd(monkeypatch, no_env, tmp_path):
     monkeypatch.setenv("MQA_DATA_DIR", "/d")
     monkeypatch.chdir(tmp_path)
     assert load_config("configs/default.yaml", env_file=no_env).llm.model == "qwen3:1.7b"
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"llm": {"max_params": 3_000_000_001}},
+        {"llm": {"max_params": 8_000_000_000}},
+        {"budget": {"max_calls": 16}},
+        {"budget": {"max_generated_tokens": 12_001}},
+        {"llm": {"num_predict": {"plan": 12_001}}},
+        {"llm": {"num_predict": {"plan": 0}}},
+    ],
+)
+def test_rule_caps_cannot_be_raised(monkeypatch, no_env, override):
+    monkeypatch.setenv("MQA_DATA_DIR", "/d")
+    with pytest.raises(ConfigError):
+        load_config(overrides=override, env_file=no_env)
+
+
+def test_rule_caps_can_be_tightened(monkeypatch, no_env):
+    monkeypatch.setenv("MQA_DATA_DIR", "/d")
+    cfg = load_config(
+        overrides={"llm": {"max_params": 2_000_000_000}, "budget": {"max_calls": 10}},
+        env_file=no_env,
+    )
+    assert (cfg.llm.max_params, cfg.budget.max_calls) == (2_000_000_000, 10)

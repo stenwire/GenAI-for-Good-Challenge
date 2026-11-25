@@ -7,7 +7,9 @@ from typing import Any
 
 import yaml
 from dotenv import dotenv_values
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError, field_validator
+
+from municipal_qa import rules
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "default.yaml"
@@ -23,7 +25,7 @@ class LLMConfig(BaseModel):
     provider: str = "ollama"
     base_url: str = "http://127.0.0.1:11434"
     model: str = "qwen3:1.7b"
-    max_params: int = 3_000_000_000
+    max_params: int = rules.MAX_TOTAL_PARAMS
     options: dict[str, Any] = Field(
         default_factory=lambda: {"temperature": 0, "seed": 42, "num_ctx": 8192}
     )
@@ -31,11 +33,42 @@ class LLMConfig(BaseModel):
     keep_alive: str = "10m"
     num_predict: dict[str, int] = Field(default_factory=dict)
 
+    @field_validator("max_params")
+    @classmethod
+    def _params_within_rule(cls, v: int) -> int:
+        if not 0 < v <= rules.MAX_TOTAL_PARAMS:
+            raise ValueError(f"max_params must be in 1..{rules.MAX_TOTAL_PARAMS:,}")
+        return v
+
+    @field_validator("num_predict")
+    @classmethod
+    def _num_predict_within_rule(cls, v: dict[str, int]) -> dict[str, int]:
+        bad = {k: n for k, n in v.items() if not 0 < n <= rules.MAX_GENERATED_TOKENS_PER_QUESTION}
+        if bad:
+            raise ValueError(f"num_predict out of range: {bad}")
+        return v
+
 
 class BudgetConfig(BaseModel):
-    max_calls: int = 15
-    max_generated_tokens: int = 12_000
+    max_calls: int = rules.MAX_CALLS_PER_QUESTION
+    max_generated_tokens: int = rules.MAX_GENERATED_TOKENS_PER_QUESTION
     reserve_tokens_for_compose: int = 800
+
+    @field_validator("max_calls")
+    @classmethod
+    def _calls_within_rule(cls, v: int) -> int:
+        if not 0 < v <= rules.MAX_CALLS_PER_QUESTION:
+            raise ValueError(f"max_calls must be in 1..{rules.MAX_CALLS_PER_QUESTION}")
+        return v
+
+    @field_validator("max_generated_tokens")
+    @classmethod
+    def _tokens_within_rule(cls, v: int) -> int:
+        if not 0 < v <= rules.MAX_GENERATED_TOKENS_PER_QUESTION:
+            raise ValueError(
+                f"max_generated_tokens must be in 1..{rules.MAX_GENERATED_TOKENS_PER_QUESTION}"
+            )
+        return v
 
 
 class RetrievalConfig(BaseModel):
@@ -110,7 +143,10 @@ def load_config(
     # Real environment wins over .env, as with a shell export.
     env = {k: v for k, v in dotenv_values(env_file).items() if v} if env_file else {}
     env.update(os.environ)
-    cfg = Config.model_validate(_expand(raw, env))
+    try:
+        cfg = Config.model_validate(_expand(raw, env))
+    except ValidationError as e:
+        raise ConfigError(str(e)) from e
     if not cfg.artifacts_dir.is_absolute():
         cfg.artifacts_dir = PROJECT_ROOT / cfg.artifacts_dir
     return cfg

@@ -226,3 +226,9 @@ def test_unreachable_server_is_not_charged(cfg, monkeypatch):
     with pytest.raises(RequestNotSent):
         client.chat([{"role": "user", "content": "x"}], "plan", budget)
     assert budget.calls_used == 0
+
+
+def test_rule_cap_holds_even_if_config_is_tampered(cfg):
+    cfg.llm.max_params = 8_000_000_000  # assignment skips validation
+    with pytest.raises(ModelTooLarge, match="cap 3,000,000,000"):
+        _client(cfg, FakeOllama(params=7_615_616_512)).check_model()
