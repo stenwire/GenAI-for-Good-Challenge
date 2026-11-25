@@ -191,7 +191,8 @@ def _xml_summary(root: etree._Element) -> tuple[Counter, int]:
 
 class StructuredReader:
     name = "structured"
-    suffixes = (".json", ".xml", ".xsd")
+    # .geojson here until the vector reader (T-202) takes it over.
+    suffixes = (".json", ".geojson", ".xml", ".xsd")
 
     def _kind(self, src: SourceInfo) -> str:
         return (
@@ -202,7 +203,7 @@ class StructuredReader:
 
     def profile(self, src: SourceInfo) -> SourceProfile:
         tables, warnings = [], []
-        if src.suffix == ".json":
+        if src.suffix in (".json", ".geojson"):
             data = load_json(src.path)
             if is_geojson(data):
                 feats = data["features"]
@@ -248,7 +249,7 @@ class StructuredReader:
     def passages(self, src: SourceInfo) -> list[Passage]:
         pb = PassageBuilder(src.source_id)
         kind = self._kind(src)
-        if src.suffix == ".json":
+        if src.suffix in (".json", ".geojson"):
             data = load_json(src.path)
             if is_geojson(data):
                 feats = data["features"]
@@ -294,7 +295,7 @@ class StructuredReader:
         return pb.items
 
     def load_table(self, src: SourceInfo, table: str | None = None) -> pd.DataFrame:
-        if src.suffix != ".json":
+        if src.suffix not in (".json", ".geojson"):
             raise UnsupportedFormat(f"{src.original_file}: XML has no table interface yet")
         data = load_json(src.path)
         if is_geojson(data):
