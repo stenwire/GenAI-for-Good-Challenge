@@ -94,7 +94,7 @@ but every one of the 600 answers is non-blank and the file is valid.
 | 3 | Special markers (`[z]`, `[x]`, `[c]`, `..`, `-`) stay strings in every reader, proved by a fixture test | [x] |
 | 4 | Every `.pdf`, `.md`, `.txt`, `.html`, `.docx`, `.json`, `.xml`, `.xsd` source yields passages with valid locators (card T1) | [x] |
 | 5 | Scorer returns 1.0 on the Train reference answers and 0.0 on empty answers (card T4) | [x] |
-| 6 | `municipal-qa/dev/dev_questions.csv` has ≥ 60 rows and `devset_check.py` passes (no Test sources) | [ ] |
+| 6 | `municipal-qa/dev/dev_questions.csv` has ≥ 60 rows and `devset_check.py` passes (no Test sources) | [x] |
 | 7 | `uv run mqa run --split test` completes for all 600 questions with zero blank answers | [ ] |
 | 8 | `uv run mqa validate` on that run's `Submission.md` reports no problems | [ ] |
 | 9 | That run's `budget.csv` shows max calls ≤ 15 and max generated tokens ≤ 12,000 | [ ] |
