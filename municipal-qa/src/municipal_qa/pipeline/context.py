@@ -90,21 +90,22 @@ def _decimals(text: str) -> tuple[int | None, dict[str, int]]:
     general: int | None = None
     overrides: dict[str, int] = {}
 
-    def apply(subj: str, n: int) -> None:
+    def apply(subj: str, n: int, before: str) -> None:
         nonlocal general
         subj_txt = _last_clause(subj)
         keys = _subject_keys(subj_txt)
+        if not keys and not _GENERAL_SUBJECT.search(subj_txt):
+            # "in hectares, rounded to two decimals": the unit sits before the comma.
+            sentence = re.split(r"[.;:]\s", before)[-1]
+            keys = [] if re.search(r"\bother\b", sentence, re.I) else _subject_keys(sentence)
         if keys and not re.search(r"\bother\b", subj_txt, re.I):
             for k in keys:
                 overrides[k] = n
-        elif keys or _GENERAL_SUBJECT.search(subj_txt) or not subj_txt.strip():
-            if general is None:
-                general = n
-        else:
-            overrides[subj_txt.strip().lower()] = n
+        elif general is None:
+            general = n
 
     for m in _DECIMALS.finditer(text):
-        apply(m.group("subj"), _num(m.group("n")))
+        apply(m.group("subj"), _num(m.group("n")), text[: m.start()])
     for m in _STEP.finditer(text):
         step = m.group("step")
         n = 0 if step == "1" else len(step.split(".")[1])

@@ -92,7 +92,7 @@ def test_no_signal_keeps_defaults():
 
 
 TRAIN_EXPECTED = {
-    "06ffb5b9": {"crs": "EPSG:27700", "repair_geometry": False, "decimals": 2},
+    "06ffb5b9": {"crs": "EPSG:27700", "repair_geometry": False},
     "2e0fb2b9": {"value_mode": "displayed", "round_at_end": True},
     "0840316b": {"value_mode": "displayed"},
     "0b7af6de": {"value_mode": "stored", "round_at_end": True},
@@ -112,6 +112,8 @@ def test_train_contexts(data_cfg):
             for field, value in exp.items():
                 assert getattr(c, field) == value, (row.ID, field)
     assert seen == set(TRAIN_EXPECTED)
+    area_q = train.set_index(train.ID.str[:8]).loc["06ffb5b9"]
+    assert parse_conventions(area_q.Context, area_q.Question).decimals_overrides["ha"] == 2
     pct = parse_conventions(train.set_index(train.ID.str[:8]).loc["2e0fb2b9", "Context"])
     assert pct.decimals_overrides == {"%": 2, "pp": 2}
 
@@ -124,3 +126,24 @@ def test_all_test_contexts_parse(data_cfg):
         assert isinstance(parse_conventions(ctx), Conventions)
     for row in test.itertuples():
         parse_conventions(row.Context, row.Question)
+
+
+def test_question_precision_after_comma_overrides_context_unit():
+    ctx = "Round derived figures to two decimals, except hectares to five decimals."
+    c = parse_conventions(ctx, "Give the area in hectares, rounded to two decimal places.")
+    assert c.decimals_overrides["ha"] == 2
+    assert parse_conventions(ctx).decimals_overrides["ha"] == 5
+
+
+def test_other_clause_does_not_capture_earlier_unit():
+    c = parse_conventions(
+        "Report hectares to five decimals; other derived figures to two decimals."
+    )
+    assert c.decimals_overrides == {"ha": 5}
+    assert c.decimals == 2
+
+
+def test_unitless_rounding_phrase_sets_general_precision():
+    c = parse_conventions("", "What is it, to four decimal places?")
+    assert c.decimals == 4
+    assert c.decimals_overrides == {}
