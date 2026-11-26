@@ -23,10 +23,23 @@ Hard external dates (from the brief, not movable):
 - Up to 1 Zindi submission per day, 20 in total. Uploading is done by the user,
   never by `/implement`.
 
+**Submissions are real runs only (D-042).** Slot 1 of 20 went on the
+walkthrough when the user joined, so at most 19 remain. Every later upload is a
+full, validated, budget-checked Test run of the pipeline: no placeholder,
+format-check or test uploads. Each milestone has one submission checkpoint,
+owned by the user; `/implement` hands over the file and the user uploads it and
+reports the leaderboard score for `SUBMISSIONS.md`. A checkpoint is skipped, with
+the reason recorded, when its dev score does not beat the last uploaded run.
+
+| Slots | Count |
+|---|---|
+| Used | 2 (walkthrough; M1 baseline `69RjT4Yb`, public 0.2158) |
+| Remaining | 18 at most |
+
 | Milestone | Name | Plan cards | Target | Depends on | Status |
 |---|---|---|---|---|---|
 | M0 | Foundation | M1, M2, M6, M7, S1, S2 | 27 Nov 2026 | - | complete |
-| M1 | Baseline Submission | M3, T1, T4, S5 (basic), T3 (≥ 60) | 30 Nov 2026 | M0 | not started |
+| M1 | Baseline Submission | M3, T1, T4, S5 (basic), T3 (≥ 60) | 30 Nov 2026 | M0 | complete |
 | M2 | Tools and Planner | M4, M5, T2, T3 (≥ 90), S3, S4 | 5 Dec 2026 | M1 | not started |
 | M3 | Feature Freeze | S5 (complete), M8 (draft) | 9 Dec 2026 | M2 | not started |
 | M4 | Final Package | M8 | 12 Dec 2026 | M3 | not started |
@@ -85,24 +98,26 @@ but every one of the 600 answers is non-blank and the file is valid.
 
 **Plan cards:** M3, T1, T4, S5 (basic), T3 (≥ 60 rows)
 
+**Submission checkpoint:** T-115, the baseline run `20261125-2323-f27f59e` (dev 0.0975).
+
 ### Definition of Done
 
 | # | Criterion | State |
 |---|---|---|
-| 1 | Train `bus01.ods` cells `BUS01a` H23, T23, H29, T29 read with both stored and displayed values (card M3) | [ ] |
-| 2 | HSY `.xlsx` `Tulokset` AA9 returns full precision for `stored` and the formatted string for `displayed` (plan §7.2) | [ ] |
-| 3 | Special markers (`[z]`, `[x]`, `[c]`, `..`, `-`) stay strings in every reader, proved by a fixture test | [ ] |
-| 4 | Every `.pdf`, `.md`, `.txt`, `.html`, `.docx`, `.json`, `.xml`, `.xsd` source yields passages with valid locators (card T1) | [ ] |
-| 5 | Scorer returns 1.0 on the Train reference answers and 0.0 on empty answers (card T4) | [ ] |
-| 6 | `municipal-qa/dev/dev_questions.csv` has ≥ 60 rows and `devset_check.py` passes (no Test sources) | [ ] |
-| 7 | `uv run mqa run --split test` completes for all 600 questions with zero blank answers | [ ] |
-| 8 | `uv run mqa validate` on that run's `Submission.md` reports no problems | [ ] |
-| 9 | That run's `budget.csv` shows max calls ≤ 15 and max generated tokens ≤ 12,000 | [ ] |
-| 10 | `SUBMISSIONS.md` has a row for the run (date, tag, run ID, dev score; leaderboard score filled in when the user reports it) | [ ] |
+| 1 | Train `bus01.ods` cells `BUS01a` H23, T23, H29, T29 read with both stored and displayed values (card M3) | [x] |
+| 2 | HSY `.xlsx` `Tulokset` AA9 returns full precision for `stored` and the formatted string for `displayed` (plan §7.2) | [x] |
+| 3 | Special markers (`[z]`, `[x]`, `[c]`, `..`, `-`) stay strings in every reader, proved by a fixture test | [x] |
+| 4 | Every `.pdf`, `.md`, `.txt`, `.html`, `.docx`, `.json`, `.xml`, `.xsd` source yields passages with valid locators (card T1) | [x] |
+| 5 | Scorer returns 1.0 on the Train reference answers and 0.0 on empty answers (card T4) | [x] |
+| 6 | `municipal-qa/dev/dev_questions.csv` has ≥ 60 rows and `devset_check.py` passes (no Test sources) | [x] |
+| 7 | `uv run mqa run --split test` completes for all 600 questions with zero blank answers | [x] |
+| 8 | `uv run mqa validate` on that run's `Submission.md` reports no problems | [x] |
+| 9 | That run's `budget.csv` shows max calls ≤ 15 and max generated tokens ≤ 12,000 | [x] |
+| 10 | `SUBMISSIONS.md` has a row for the run (date, tag, run ID, dev score; leaderboard score filled in when the user reports it) | [x] |
 
 ### Verification
 
-- Verified: no
+- Verified: yes, 2026-11-26 (`docs/VERIFICATION.md`: M1 - Baseline Submission, 0 blockers, PASS; third pass, its minor fixed by T-120)
 
 ---
 
@@ -113,6 +128,8 @@ and point-cloud ops, hybrid retrieval with reranking, and the router/planner
 with JSON-schema-constrained output and repair.
 
 **Plan cards:** M4, M5, T2, T3 (≥ 90 rows), S3, S4
+
+**Submission checkpoint:** T-212, a full Test run of the planner pipeline after T-210.
 
 ### Definition of Done
 
@@ -141,6 +158,8 @@ offline reproduction that mirrors the organisers' rerun environment.
 
 **Plan cards:** S5 (complete), M8 (draft)
 
+**Submission checkpoint:** T-307, the feature-frozen, size-controlled run after T-304 and T-306.
+
 ### Definition of Done
 
 | # | Criterion | State |
@@ -166,6 +185,8 @@ Delivers the final full run, the two selected submissions, and a code package
 ready for the 48-hour code request.
 
 **Plan cards:** M8
+
+**Submission checkpoint:** T-406, the T-401 final run before 13 Dec 2026 23:59 EST, then the final two chosen in T-402.
 
 ### Definition of Done
 

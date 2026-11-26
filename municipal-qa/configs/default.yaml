@@ -19,12 +19,14 @@ retrieval:
   k_bm25: 30
   k_dense: 30
   k_final: 8
+  docs_first: 3       # documentation passages placed ahead of other hits
   chunk_chars: 900
   chunk_overlap: 150
 pipeline:
   max_repairs: 2
   max_extra_plans: 2
   enable_rewrite: true
+  evidence_from_top: 4   # baseline: evidence lines from the top retrieved passages
 run:
   workers: 1          # Ollama serialises anyway; profiling/indexing may use more
   resume: true

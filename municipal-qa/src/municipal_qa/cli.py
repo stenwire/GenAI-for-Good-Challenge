@@ -80,19 +80,124 @@ def run(
     resume: Annotated[str | None, typer.Option(help="Run ID to resume.")] = None,
 ) -> None:
     """Answer questions and write artifacts/runs/<run_id>/."""
-    _not_implemented("run")
+    import datetime as dt
+    import time
+
+    from municipal_qa.config import load_config
+    from municipal_qa.data.manifest import load_manifest
+    from municipal_qa.data.questions import load_questions
+    from municipal_qa.llm.client import LLMClient, LLMError
+    from municipal_qa.pipeline import run as runner
+    from municipal_qa.pipeline.answer import Deps, answer_question
+
+    cfg = load_config()
+    run_id = resume or runner.new_run_id()
+    run_dir = cfg.artifacts_dir / "runs" / run_id
+    if resume and not run_dir.exists():
+        typer.echo(f"no run {resume} to resume", err=True)
+        raise typer.Exit(code=1)
+    if not resume and run_dir.exists():
+        typer.echo(f"run {run_id} already exists; pass --resume {run_id} to continue it", err=True)
+        raise typer.Exit(code=1)
+    questions = runner.select(load_questions(cfg, split), ids, limit)
+    client = LLMClient(cfg)
+    try:
+        model = client.check_model()
+    except LLMError as e:
+        typer.echo(f"FAILED model check: {e}", err=True)
+        raise typer.Exit(code=1) from e
+    deps = Deps(cfg, load_manifest(cfg), client, cache_dir=cfg.artifacts_dir / "passages")
+    run_dir.mkdir(parents=True, exist_ok=bool(resume))
+    start = dt.datetime.now().isoformat(timespec="seconds")
+    runner.write_manifest(run_dir, cfg, split, model, {"started": start, "status": "running"})
+    t0 = time.perf_counter()
+
+    def progress(i: int, n: int, rec) -> None:
+        if i == n or i % 25 == 0:
+            typer.echo(f"  {i}/{n} answered ({time.perf_counter() - t0:.0f}s)")
+
+    n = runner.run_questions(questions, lambda q: answer_question(q, deps), run_dir, progress)
+    rows, max_calls, max_tokens = runner.write_budget_csv(run_dir)
+    runner.write_manifest(
+        run_dir,
+        cfg,
+        split,
+        model,
+        {
+            "finished": dt.datetime.now().isoformat(timespec="seconds"),
+            "status": "complete",
+            "answered_this_session": n,
+            "answers": rows,
+            "max_calls": max_calls,
+            "max_generated_tokens": max_tokens,
+        },
+    )
+    typer.echo(
+        f"run {run_id}: {rows} answers, max calls {max_calls}, "
+        f"max generated tokens {max_tokens} -> {run_dir}"
+    )
 
 
 @app.command()
-def evaluate(run_id: str) -> None:
+def evaluate(
+    run_id: str,
+    split: Annotated[
+        str | None, typer.Option(help="Override the split recorded in run_manifest.json.")
+    ] = None,
+) -> None:
     """Score a dev run per domain and question type."""
-    _not_implemented("evaluate")
+    import json
+
+    from municipal_qa.config import load_config
+    from municipal_qa.evaluation.report import render
+    from municipal_qa.evaluation.scorer import evaluate_run
+
+    cfg = load_config()
+    run_dir = cfg.artifacts_dir / "runs" / run_id
+    if not (run_dir / "answers.jsonl").exists():
+        typer.echo(f"no answers.jsonl in {run_dir}", err=True)
+        raise typer.Exit(code=1)
+    manifest = run_dir / "run_manifest.json"
+    if split is None and manifest.exists():
+        split = json.loads(manifest.read_text()).get("split")
+    split = split or "dev"
+    typer.echo(f"# Evaluation of {run_id} ({split})\n")
+    typer.echo(render(evaluate_run(run_dir, split, cfg)))
 
 
 @app.command()
 def submit(run_id: str) -> None:
     """Write and validate artifacts/runs/<run_id>/Submission.md."""
-    _not_implemented("submit")
+    from municipal_qa.config import load_config
+    from municipal_qa.data.manifest import load_manifest
+    from municipal_qa.data.questions import load_questions
+    from municipal_qa.pipeline.run import load_run_records
+    from municipal_qa.submission.validator import validate_submission
+    from municipal_qa.submission.writer import write_submission
+
+    cfg = load_config()
+    run_dir = cfg.artifacts_dir / "runs" / run_id
+    test = load_questions(cfg, "test")
+    ids = [q.id for q in test]
+    records = load_run_records(run_dir)
+    missing = [i for i in ids if i not in records]
+    if missing:
+        typer.echo(
+            f"run {run_id} lacks {len(missing)} Test answers (e.g. {missing[:2]}); "
+            "finish it with: mqa run --split test --resume " + run_id,
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    out = write_submission({i: records[i] for i in ids}, ids, run_dir / "Submission.md")
+    warnings: list[str] = []
+    problems = validate_submission(
+        out, ids, {q.id: q.source_ids for q in test}, set(load_manifest(cfg)), warnings
+    )
+    for p in problems:
+        typer.echo(f"problem: {p}", err=True)
+    if problems:
+        raise typer.Exit(code=1)
+    typer.echo(f"wrote {out} ({out.stat().st_size:,} bytes), valid, {len(warnings)} warning(s)")
 
 
 @app.command()
@@ -126,7 +231,21 @@ def validate(path: Path) -> None:
 @app.command()
 def show(run_id: str, question_id: str) -> None:
     """Pretty-print one AnswerRecord."""
-    _not_implemented("show")
+    from municipal_qa.config import load_config
+    from municipal_qa.pipeline.run import load_run_records
+
+    records = load_run_records(load_config().artifacts_dir / "runs" / run_id)
+    if question_id not in records:
+        typer.echo(f"{question_id} not in run {run_id}", err=True)
+        raise typer.Exit(code=1)
+    rec = records[question_id]
+    typer.echo(f"# {question_id}\n\n{rec.answer}\n\n### Evidence")
+    for line in rec.evidence:
+        typer.echo(f"- {line}")
+    typer.echo(
+        f"\ncalls {rec.total_calls}, generated tokens {rec.total_generated_tokens}, "
+        f"fallback {rec.fallback_used}, error {rec.error}"
+    )
 
 
 if __name__ == "__main__":

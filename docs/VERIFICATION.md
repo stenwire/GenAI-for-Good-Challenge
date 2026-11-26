@@ -1,32 +1,21 @@
 # Verification Report
 
-**Milestone:** M0 - Foundation
-**Scope:** M0 tasks T-001..T-023 and all 12 Definition-of-Done rows; every checklist item touched by M0 code (`config.py`, `rules.py`, `cli.py`, `schema.py`, `pipeline/context.py`, `data/`, `submission/`, `llm/budget.py`, `llm/client.py`, `notebooks/00_starter.ipynb`, tests, `pyproject.toml`, `uv.lock`, `.gitignore`, `LICENSE`); Dimension 1 (competition rules, RUL-01..RUL-19) in full; re-check of the 3 findings from the second M0 verify pass, plus edge-case probes of the code changed since (`_parse_chat_reply`, determinism validators). Branch `m0-foundation` at `57373a4`.
-**Run audited:** none (no `municipal-qa/artifacts/runs/` exists; `mqa run` is not built in M0)
-**Date:** 2026-11-25
+**Milestone:** M1 - Baseline Submission
+**Scope:** M1 tasks T-101..T-120 and all 10 Definition-of-Done rows, with a code re-read of everything changed since the third M1 audit (`64cce8c..e8acff7`: `pipeline/answer.py` `_is_item`/`_fold_bullets`, `tests/test_answer.py`, tracker updates); every checklist item M1 code touches; Dimension 1 (RUL-01..RUL-19) in full. Branch `m1-baseline-submission` at `e8acff7`, clean apart from the long-standing untracked `.claude/` and `docs/CHALLENGE_BRIEF.md`.
+**Run audited:** `20261125-2323-f27f59e` (Test, 600 questions; the uploaded file, Zindi `69RjT4Yb`, public 0.215775462). Produced by `f27f59e`, before T-110..T-120; the T-120 change was checked against the code, the suite, edge-case probes and a replay of `clean_answer` over the stored dev and Test answers.
+**Date:** 2026-11-26
 **Blockers:** 0
 **Major:** 0
 **Minor:** 0
 **Verdict:** PASS
-**Dimensions not verified:** Run-based checks RUL-09, SUB-01 (on a run), SUB-04, SUB-08, REP-03 (no run exists). Checks on modules not built in M0: RUL-04, RUL-08, RUL-12, RUL-14, SUB-05..SUB-07, COR-02..COR-07, COR-09..COR-11, TST-05, LAY-03, LAY-06, REP-05..REP-07, ACC-03..ACC-05. Checklist Gaps rows: Ollama pull in the rerun, rerun wall-clock limit, Zindi file-size limit, challenge data remaining in public git history.
+**Dimensions not verified:** RUL-04 (no embedder or reranker yet), RUL-08 (no shared generative preprocessing exists), RUL-05's import-scan test (`evaluation/judge.py` not built; test is T-303); COR-04/05/09/10/11 and LAY-03 (calc, spatial, composer, verifier, op Facts not built in M1); REP-05..07 (no local encoders yet; README is M3/M4). Checklist Gaps rows: Ollama pull in the rerun, rerun wall-clock limit, challenge data in public git history; Zindi file-size limit (user evidence: Zindi scored the 795,356-byte file; no organiser figure yet).
 
 ## Findings
 
 | # | Severity | Dimension | Location | Finding | Remediation |
 |---|---|---|---|---|---|
 
-None. Leads examined and dropped after confirmation:
-
-- `eval_count` above `num_predict` (99,999): recorded as reported, then `BudgetExceeded` stops further calls. This is the defensive behaviour card M6 asks for; the client cannot stop a server that ignores `num_predict`.
-- `options.temperature: false` passes the validator (`False == 0`), but live Ollama rejects it: `500 {"error":"option \"temperature\" must be of type float32"}`. It fails loudly and cannot silently change sampling.
-
-### Second pass's findings (re-checked)
-
-| Prev # | Was | Now | Proof |
-|---|---|---|---|
-| 1 | blocker: malformed 200 reply uncharged | fixed (T-021) | JSON list ×3 → `(3, 2100, 'LLMError')`; 20 malformed → `(15, 10500, 'BudgetExceeded')`; `eval_count '12abc'` → `(1, 700, 'LLMError')` |
-| 2 | minor: temperature, seed, think unvalidated | fixed (T-022) | `temperature: 0.7` refused; `think: true` refused; `temperature: 0.0` accepted |
-| 3 | minor: RUL-13 flags `urllib.parse` | fixed (T-023) | RUL-13 now matches only `llm/client.py:8:import httpx` |
+No findings. Third-pass finding 1 (T-120) is confirmed fixed: both probes keep their numbers, and nine further edge-case probes plus the replay over 662 stored answers lose no value, leave no bullet line, no blank answer and no `## ` line.
 
 ## Commands run
 
@@ -35,9 +24,14 @@ $ git status --porcelain            # at start of run
 ?? .claude/
 ?? docs/CHALLENGE_BRIEF.md
 $ git log --oneline -1
-57373a4 T-023 (M0): narrow network-import check and return M0 to awaiting verify
-$ ls municipal-qa/artifacts/runs
-ls: municipal-qa/artifacts/runs: No such file or directory
+e8acff7 T-120 (S5): keep leading numbers when folding answer lists; complete M1
+$ git diff --stat 64cce8c..HEAD
+ docs/MILESTONES.md                               |   4 +-
+ docs/TODO.md                                     |   8 ++
+ docs/VERIFICATION.md                             | 138 ++++++++++-------------
+ municipal-qa/src/municipal_qa/pipeline/answer.py |   9 +-
+ municipal-qa/tests/test_answer.py                |   7 +-
+ 5 files changed, 77 insertions(+), 89 deletions(-)
 ```
 
 RUL-01
@@ -49,20 +43,35 @@ quantization: Q4_K_M
 exit 0
 ```
 
-RUL-03 (both hits in the only module allowed to call the model)
+RUL-02, RUL-07: `llm/client.py` unchanged since the first M1 audit.
+
+RUL-03
 ```
 municipal-qa/src/municipal_qa/llm/client.py:116:            data = self._post("/api/chat", payload)
 municipal-qa/src/municipal_qa/llm/client.py:128:            raise LLMError(f"{purpose}: malformed /api/chat reply: {e}") from e
 ```
 
-RUL-05: exit 1 (no hits). RUL-06: `tests/test_budget.py` 11 passed. RUL-11: exit 1. RUL-12: `municipal_qa.evaluation` not present → not verified (T-106, M1). RUL-15: exit 1.
+RUL-05: exit 1 (`evaluation/` has no `judge.py`). RUL-11: exit 1. RUL-15: exit 1. RUL-18: exit 1. RUL-14: no file access changed since the third pass.
 
-RUL-10 (scanned `src`, `configs`, `tests`, `notebooks`; `llm/prompts/` does not exist yet)
+RUL-06: `11 passed in 0.01s`.
+
+RUL-09 (all 600 rows of the audited run)
 ```
-needles=1355 files=27 hits=0
+600 1 600
 ```
 
-RUL-13 (narrowed pattern from T-023)
+RUL-10 (src, configs, prompt template, tests, notebooks, dev)
+```
+needles=1355 files=58 hits=0 prompt_files=1
+```
+
+RUL-12
+```
+OK: dev_questions.csv, 62 rows, 0 problem(s)
+exit 0
+```
+
+RUL-13
 ```
 municipal-qa/src/municipal_qa/llm/client.py:8:import httpx
 ```
@@ -74,104 +83,96 @@ Version 2.0, January 2004
 http://www.apache.org/licenses/
 ```
 
-RUL-17
+RUL-17 / RUL-19
 ```
- Name                       Version     License
- fqdn                       1.6.0       MPL-2.0
  certifi                    2026.11.20  Mozilla Public License 2.0 (MPL 2.0)
+ fqdn                       1.6.0       MPL-2.0
+(filtered):          <- empty = pass
+0                    <- fqdn not in the runtime tree
 ```
 
-RUL-18: both `git ls-files` scans exit 1 (no challenge data, `.env` or zip tracked).
-
-RUL-19
+SUB-01, SUB-02, SUB-04, SUB-07, SUB-08
 ```
-(no lines above = pass)
-0
-```
-
-Reply-parser and validator probes (read-only, from stdin, mock transport)
-```
-prev-blocker JSON list x3: (3, 2100, 'LLMError')
-eval '12abc': (1, 700, 'LLMError')
-eval 99999 (above caps): (1, 99999, 'BudgetExceeded')
-eval null message null: (1, 700, None)
-loop of 20 malformed: (15, 10500, 'BudgetExceeded')
-refused {'llm': {'options': {'temperature': 0.7, 'seed': 42}}}
-refused {'llm': {'think': True}}
-ACCEPTED {'llm': {'options': {'temperature': 0.0, 'seed': 42}}}
-ACCEPTED {'llm': {'options': {'temperature': False, 'seed': 42}}}
-```
-
-Live check of the `temperature: false` lead (one direct request to the local Ollama server)
-```
-temperature=false -> 500 {"error":"option \"temperature\" must be of type float32"}
-```
-
-Tests
-```
-tests/test_submission.py: 16 passed in 0.49s
-tests/test_context.py: 33 passed in 0.83s
-tests/test_client.py + tests/test_config.py: 61 passed in 0.16s
-full suite: 137 passed in 1.12s
-```
-
-DoD 6 and DoD 8
-```
-verified 188 sources (size and SHA256) in /Users/Apple/Desktop/Lab/playground/GenAI-for-Good-Challenge/Data/sources [0.7s]
+1 warning(s), e.g. file is 795,356 bytes, above the unofficial 256 KiB guidance
+valid: 600 Test IDs in order, 795,356 bytes
 exit 0
-600 warning(s), e.g. 0044bdd2-0acc-4876-a094-6257c2879406: no evidence lines
-valid: 600 Test IDs in order, 182,042 bytes
-exit 0
+e41ef0d2d5097cec
+2205
+2337          # file predates T-112..T-120; the replay below shows the current cleaner removes every bullet line
+16 passed in 0.23s       # tests/test_submission.py
+14 passed in 0.33s       # tests/test_answer.py
 ```
 
-BLD-01..BLD-04
+T-120 probes and replay of the current `clean_answer` (counts only for stored answers)
 ```
-/Users/Apple/Desktop/Lab/playground/GenAI-for-Good-Challenge/main/GenAI-for-Good-Challenge/municipal-qa/.venv
-All checks passed!
-27 files already formatted
-mqa --help commands matched: 9
-nbstripout verify exit 0
-.gitignore:230:municipal-qa/.venv/
-.gitignore:231:municipal-qa/artifacts/
-.gitignore:232:municipal-qa/.env
-.gitignore:227:/Data/
-.gitignore:81:.ipynb_checkpoints
-municipal-qa/notebooks/00_starter.ipynb: filter: nbstripout
+'15. Fifteen routes changed.\n- two of them in 2024' -> '15. Fifteen routes changed. two of them in 2024.'
+'- 5. stops closed' -> '5. stops closed.'
+'15. Fifteen routes changed.' -> '15. Fifteen routes changed.'
+'Steps:\n1. Open\n2) Close' -> 'Steps: Open. Close.'
+'Total:\n- \n- x\n*' -> 'Total: x.'
+'Changes:\n- 3 closed\n1. one new' -> 'Changes: 3 closed.\n1. one new'
+'No. The [z] marker is not zero.' -> 'No. The [z] marker is not zero.'
+'3.48 ha.\n- zone A' -> '3.48 ha. zone A.'
+'Answer:\n\n- a\n\n- b' -> 'Answer:\n\na.\n\nb.'
+20261125-2322-f27f59e bullet lines before 3 after 0 | blank after 0 | '## ' after 0 | changed 3 of 62
+20261125-2323-f27f59e bullet lines before 30 after 0 | blank after 0 | '## ' after 0 | changed 30 of 600
 ```
 
-REP-01, REP-02, REP-04
+REP-01/02/03/04
 ```
-uv.lock, pyproject.toml, .python-version tracked: 3; .venv tracked: none
+.python-version
+pyproject.toml
+uv.lock
 8:  options: {temperature: 0, seed: 42, num_ctx: 8192}
 9:  think: false
-REP-04 (src, configs, notebooks): exit 1
+f27f59e False 42 0 8f68893c685c complete
+REP-04 exit 1
 ```
 
-LAY-01, LAY-02, LAY-04, LAY-07, LAY-08
+TST-01, TST-05 (and source tree after the suite)
 ```
+258 passed in 14.31s
+(git status --porcelain -- src tests: empty)
+23 passed, 235 deselected in 0.48s
+```
+
+LAY-04, LAY-07, LAY-08
+```
+municipal-qa/src/municipal_qa/pipeline/evidence.py:19:    return f"{source_id} | {clean(locator) or 'file'} | {clean(claim) or 'source consulted'}"
 LAY-07 blocks > 5 lines: none
-LAY-01 schema AST == plan §5: True
-LAY-02: exit 1; LAY-04: exit 1
-LAY-08: rg in municipal-qa exit 1; git log (80 commits) exit 1; PR #1 body exit 1
+attribution scans (municipal-qa, commits main..HEAD, PR #2 body): exit 1, exit 1, exit 1
+```
+
+BLD-01..04
+```
+/Users/Apple/.../municipal-qa/.venv
+All checks passed!
+57 files already formatted
+9
+.gitignore:230:municipal-qa/.venv/	municipal-qa/.venv
+.gitignore:231:municipal-qa/artifacts/	municipal-qa/artifacts
+.gitignore:232:municipal-qa/.env	municipal-qa/.env
+.gitignore:227:/Data/	Data/sources
 ```
 
 ACC-01, ACC-02
 ```
-M0 tasks not [x]: 0 of 23
-M0 DoD rows [x]: 12 of 12
-M0 status: awaiting verify
-B-001, B-002, B-004, B-005, B-006 resolved; B-003 open (blocks T-404, M4)
+T-101[x] T-102[x] T-103[x] T-104[x] T-105[x] T-106[x] T-107[x] T-108[x] T-109[x] T-110[x] T-111[x] T-112[x] T-113[x] T-114[x] T-115[x] T-116[x] T-117[x] T-118[x] T-119[x] T-120[x]
+DoD1[x] DoD2[x] DoD3[x] DoD4[x] DoD5[x] DoD6[x] DoD7[x] DoD8[x] DoD9[x] DoD10[x]
+M1 status: complete
+open blockers: B-003 only (blocks T-404, M4)
+PR #2: OPEN
 ```
 
 ## Dimension summary
 
 | Dimension | Result | Notes |
 |---|---|---|
-| 1. Competition-rule compliance | PASS | RUL-01, 03, 05, 06, 10 (1,355 needles, 27 files, 0 hits), 11, 13, 15, 16, 17, 18, 19 pass; budget probes stop at 15 calls. Not verified: RUL-04, 08, 09, 12, 14 (not built / no run). |
-| 2. Submission validity and evidence | PASS | SUB-02, SUB-03 pass; placeholder validates. SUB-01/04/08 on a run not verified; SUB-05..07 not built. |
-| 3. Correctness and conventions | PASS (M0 scope) | COR-01, COR-08 pass. Others not built in M0. |
-| 4. Reproducibility and licensing | PASS (M0 scope) | REP-01, 02, 04 pass; determinism now enforced in config. REP-03, 05..07 and Gaps rows not verified. |
-| 5. Tests | PASS | 137 passed, nothing skipped with data present. TST-05 not built. |
-| 6. Layering and DRY | PASS | LAY-01 AST identical; LAY-02, 04, 07, 08 pass. LAY-03, 06 not built. |
+| 1. Competition-rule compliance | PASS | RUL-01, 03, 05 (scan), 06, 09 (600/600 rows: max 1 call, 600 tokens), 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 pass. RUL-04, 08 and the RUL-05 test not verified (not built). |
+| 2. Submission validity and evidence | PASS | Audited file valid, 600 IDs in order, non-blank, 2,205 code-built evidence lines; current cleaner leaves no bullet line and loses no leading value. |
+| 3. Correctness and conventions | PASS (M1 scope) | No reader, marker or SQLite code changed; calc, spatial and composer checks belong to M2/M3. |
+| 4. Reproducibility and licensing | PASS | Manifest, seed, temperature, digest, cache fingerprint; licences clean. |
+| 5. Tests | PASS | 258 passed; the suite writes no tracked file. |
+| 6. Layering and DRY | PASS | Evidence lines formatted only in `pipeline/evidence.py`; no comment block over 5 lines. |
 | 7. Build and lint | PASS | BLD-01..04 pass. |
-| 8. Milestone acceptance | PASS | T-001..T-023 and DoD 1..12 all `[x]`; DoD proofs 6, 8, 9 re-run and pass. |
+| 8. Milestone acceptance | PASS | All 20 tasks and all 10 DoD rows `[x]`; M1 `complete` confirmed by this audit. |
