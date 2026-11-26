@@ -57,7 +57,7 @@ def op(name: str, description: str, properties: dict, required: list[str], group
     return deco
 
 
-MODULES = ("table_ops", "calc", "spatial_ops", "raster_ops")
+MODULES = ("table_ops", "calc", "spatial_ops", "raster_ops", "text_ops")
 
 
 def load_all() -> dict[str, OpSpec]:
@@ -99,6 +99,7 @@ class ExecContext:
     source_ids: list[str]
     tables: dict[tuple, pd.DataFrame] = field(default_factory=dict)
     env: dict[str, ToolResult] = field(default_factory=dict)
+    retriever: Any = None
 
     def source(self, sid: str) -> SourceInfo:
         if sid not in self.source_ids or sid not in self.store.manifest:

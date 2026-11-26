@@ -99,6 +99,7 @@ class RetrievalConfig(BaseModel):
     reranker_model: str | None = None
     embed_batch: int = 64
     rrf_k: int = 60
+    max_per_source: int = 3
     k_bm25: int = 30
     k_dense: int = 30
     k_final: int = 8

@@ -18,6 +18,7 @@ retrieval:
   reranker_model: null                       # no cross-encoder without tqdm/torch (D-052)
   embed_batch: 64
   rrf_k: 60
+  max_per_source: 4   # hits per source in the top k, so multi-source questions see each file
   k_bm25: 30
   k_dense: 30
   k_final: 8

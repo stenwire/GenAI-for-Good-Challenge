@@ -76,9 +76,44 @@ def profile(
 
 
 @app.command()
-def index() -> None:
-    """Build the retrieval index."""
-    _not_implemented("index")
+def index(
+    source: Annotated[str | None, typer.Option(help="Index one source ID only.")] = None,
+    force: Annotated[bool, typer.Option("--force", help="Re-embed cached sources.")] = False,
+) -> None:
+    """Build the retrieval index: passages, column passages and encoder vectors."""
+    import time
+
+    import municipal_qa.readers  # noqa: F401
+    from municipal_qa.config import load_config
+    from municipal_qa.data.manifest import load_manifest
+    from municipal_qa.llm.client import LLMClient, LLMError
+    from municipal_qa.profiling.profile import ProfileStore
+    from municipal_qa.retrieval.index import Retriever
+
+    cfg = load_config()
+    manifest = load_manifest(cfg)
+    if source:
+        if source not in manifest:
+            typer.echo(f"unknown source {source}", err=True)
+            raise typer.Exit(code=1)
+        manifest = {source: manifest[source]}
+    client = LLMClient(cfg)
+    try:
+        info = client.check_embedder()
+    except LLMError as e:
+        typer.echo(f"FAILED: {e}", err=True)
+        raise typer.Exit(code=1) from e
+    retriever = Retriever(cfg, ProfileStore(cfg, manifest), client)
+    if force:
+        for sid in manifest:
+            retriever._path(sid).unlink(missing_ok=True)
+    t0 = time.perf_counter()
+    meta = retriever.build(list(manifest))
+    typer.echo(
+        f"indexed {meta['sources']} sources, {meta['passages']:,} passages in "
+        f"{time.perf_counter() - t0:.1f}s -> {retriever.dir}\nencoder: {info['name']} "
+        f"({info['architecture']}, {info['parameter_count']:,} parameters, {info['capabilities']})"
+    )
 
 
 @app.command("check-model")
