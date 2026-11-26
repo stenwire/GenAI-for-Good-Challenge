@@ -95,8 +95,10 @@ class BudgetConfig(BaseModel):
 
 
 class RetrievalConfig(BaseModel):
-    embedding_model: str
-    reranker_model: str
+    embedding_model: str | None = None  # Ollama encoder; None = BM25 only
+    reranker_model: str | None = None
+    embed_batch: int = 64
+    rrf_k: int = 60
     k_bm25: int = 30
     k_dense: int = 30
     k_final: int = 8
@@ -125,6 +127,16 @@ class Config(BaseModel):
     retrieval: RetrievalConfig
     pipeline: PipelineConfig
     run: RunConfig
+
+    @field_validator("retrieval")
+    @classmethod
+    def _embedder_is_not_the_llm(cls, v: RetrievalConfig, info) -> RetrievalConfig:
+        llm = info.data.get("llm")
+        if v.embedding_model and llm and v.embedding_model == llm.model:
+            raise ValueError(
+                "retrieval.embedding_model must be an encoder, not the generative model"
+            )
+        return v
 
     @property
     def sources_dir(self) -> Path:
