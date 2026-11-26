@@ -33,13 +33,13 @@ the reason recorded, when its dev score does not beat the last uploaded run.
 
 | Slots | Count |
 |---|---|
-| Used | 1 (walkthrough) |
-| Remaining | 19 at most |
+| Used | 2 (walkthrough; M1 baseline `69RjT4Yb`, public 0.2158) |
+| Remaining | 18 at most |
 
 | Milestone | Name | Plan cards | Target | Depends on | Status |
 |---|---|---|---|---|---|
 | M0 | Foundation | M1, M2, M6, M7, S1, S2 | 27 Nov 2026 | - | complete |
-| M1 | Baseline Submission | M3, T1, T4, S5 (basic), T3 (≥ 60) | 30 Nov 2026 | M0 | in progress |
+| M1 | Baseline Submission | M3, T1, T4, S5 (basic), T3 (≥ 60) | 30 Nov 2026 | M0 | awaiting verify |
 | M2 | Tools and Planner | M4, M5, T2, T3 (≥ 90), S3, S4 | 5 Dec 2026 | M1 | not started |
 | M3 | Feature Freeze | S5 (complete), M8 (draft) | 9 Dec 2026 | M2 | not started |
 | M4 | Final Package | M8 | 12 Dec 2026 | M3 | not started |

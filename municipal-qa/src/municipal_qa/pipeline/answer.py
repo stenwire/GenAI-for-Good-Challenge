@@ -38,17 +38,30 @@ def fallback_text(q: Question) -> str:
     )
 
 
-_BULLET = re.compile(r"^\s*(?:[-*•+]|\d{1,2}[.)])\s+")
+_BULLET = re.compile(r"^\s*[-*•+]\s+")
+_NUMBERED = re.compile(r"^\s*\d{1,2}[.)]\s+")
+_BARE_MARKER = re.compile(r"^\s*(?:[-*•+]|\d{1,2}[.)])\s*$")
+
+
+def _is_item(lines: list[str], i: int) -> bool:
+    """Bullets always; `N.` only beside another list line, so a leading value survives."""
+    if _BULLET.match(lines[i]):
+        return True
+    near = [lines[j] for j in (i - 1, i + 1) if 0 <= j < len(lines)]
+    return bool(_NUMBERED.match(lines[i])) and any(
+        _NUMBERED.match(n) or _BULLET.match(n) for n in near
+    )
 
 
 def _fold_bullets(lines: list[str]) -> list[str]:
     """List items become sentences of one paragraph, so no answer line starts with `- `."""
+    lines = [ln for ln in lines if not _BARE_MARKER.match(ln)]
     out: list[str] = []
-    for ln in lines:
-        if not _BULLET.match(ln):
+    for i, ln in enumerate(lines):
+        if not _is_item(lines, i):
             out.append(ln)
             continue
-        item = _BULLET.sub("", ln).strip()
+        item = _NUMBERED.sub("", _BULLET.sub("", ln), count=1).strip()
         if item and item[-1] not in ".!?:;":
             item += "."
         if out and out[-1].strip():

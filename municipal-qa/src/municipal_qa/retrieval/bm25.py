@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from functools import cache
+from importlib import metadata
 from pathlib import Path
 
 import bm25s
@@ -14,16 +15,37 @@ from municipal_qa.readers.base import UnsupportedFormat, get_reader, is_document
 from municipal_qa.schema import Locator, Passage, SourceInfo
 
 DOC_KINDS = {"doc", "dictionary", "notes_sheet", "metadata"}
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 _PKG = Path(__file__).resolve().parents[1]
+READER_LIBS = [
+    "beautifulsoup4",
+    "duckdb",
+    "lxml",
+    "openpyxl",
+    "pandas",
+    "pdfminer.six",
+    "pdfplumber",
+    "pillow",
+    "python-docx",
+]
+
+
+def _version(name: str) -> str:
+    try:
+        return metadata.version(name)
+    except metadata.PackageNotFoundError:
+        return "missing"
 
 
 @cache
 def code_fingerprint() -> str:
-    """Hash of every reader module and this file: any edit invalidates cached passages."""
+    """Hash of reader code, the passage schema and reader library versions."""
     h = hashlib.sha256(f"v{CACHE_VERSION}".encode())
-    for f in sorted([*(_PKG / "readers").glob("*.py"), Path(__file__).resolve()]):
-        h.update(f.name.encode() + b"\0" + f.read_bytes())
+    files = [*(_PKG / "readers").glob("*.py"), _PKG / "retrieval" / "bm25.py", _PKG / "schema.py"]
+    for f in sorted(files, key=lambda p: p.relative_to(_PKG).as_posix()):
+        h.update(f.relative_to(_PKG).as_posix().encode() + b"\0" + f.read_bytes())
+    for name in READER_LIBS:
+        h.update(f"{name}=={_version(name)}".encode())
     return h.hexdigest()[:16]
 
 

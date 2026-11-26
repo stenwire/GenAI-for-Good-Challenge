@@ -199,21 +199,31 @@ def test_passage_cache_invalidated_by_source_or_reader_change(env, monkeypatch):
     assert len(list(cache.glob(f"{sid}.*.json"))) == 3
 
 
-def test_fingerprint_covers_every_reader_module():
+def test_fingerprint_covers_readers_schema_and_libraries(tmp_path, monkeypatch):
+    import shutil
+
     from municipal_qa.retrieval import bm25
 
+    pkg = tmp_path / "pkg"
+    shutil.copytree(bm25._PKG / "readers", pkg / "readers")
+    (pkg / "retrieval").mkdir()
+    shutil.copy(bm25._PKG / "retrieval" / "bm25.py", pkg / "retrieval")
+    shutil.copy(bm25._PKG / "schema.py", pkg)
+    monkeypatch.setattr(bm25, "_PKG", pkg)
+
+    def fp():
+        bm25.code_fingerprint.cache_clear()
+        return bm25.code_fingerprint()
+
+    seen = {fp()}
+    for rel in ("readers/spreadsheet.py", "retrieval/bm25.py", "schema.py"):
+        with open(pkg / rel, "a") as f:
+            f.write("\n")
+        seen.add(fp())
+    monkeypatch.setattr(bm25, "_version", lambda name: "0" if name == "pdfplumber" else "1")
+    seen.add(fp())
+    assert len(seen) == 5
     bm25.code_fingerprint.cache_clear()
-    before = bm25.code_fingerprint()
-    target = bm25._PKG / "readers" / "spreadsheet.py"
-    original = target.read_bytes()
-    try:
-        target.write_bytes(original + b"\n")
-        bm25.code_fingerprint.cache_clear()
-        assert bm25.code_fingerprint() != before
-    finally:
-        target.write_bytes(original)
-        bm25.code_fingerprint.cache_clear()
-    assert bm25.code_fingerprint() == before
 
 
 def test_bullets_fold_into_sentences():
@@ -223,6 +233,9 @@ def test_bullets_fold_into_sentences():
     assert not re.search(r"^\s*(?:[-*•+]|\d{1,2}[.)])\s", out, re.M)
     assert clean_answer("- Only item") == "Only item."
     assert clean_answer("-5 degrees is the minimum.") == "-5 degrees is the minimum."
+    assert clean_answer("15. Fifteen routes changed.") == "15. Fifteen routes changed."
+    assert clean_answer("Total:\n- \n- x\n*") == "Total: x."
+    assert clean_answer("Steps:\n1. Open\n2) Close") == "Steps: Open. Close."
 
 
 def test_tunables_come_from_config(env, monkeypatch):
