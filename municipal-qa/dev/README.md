@@ -1,6 +1,6 @@
 # Dev set
 
-`dev_questions.csv` holds 62 dev questions written for this project from the 22 **Train**
+`dev_questions.csv` holds 92 dev questions written for this project from the 22 **Train**
 sources only (`Source_Set == "Train"` in `SourceManifest.csv`). No Test question, Test source
 or Test answer is used, and no challenge file is copied here: the Train questions themselves
 stay in `Train.csv` under `MQA_DATA_DIR`.

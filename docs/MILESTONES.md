@@ -139,8 +139,8 @@ with JSON-schema-constrained output and repair.
 | 2 | Every op in plan §6.5 is registered, has a JSON args schema and a fixture test, and returns `Fact`s with locators (card M5) | [ ] |
 | 3 | Train `1bbb3964` reproduced by `set_compare`; Train `1d78cef6` reproduced by `lookup_row` + `date_diff` (35 days) | [ ] |
 | 4 | Train `06ffb5b9` yields 3.48 ha; 100 m square → 1.00000 ha; half-up vs half-even on 2.345; inclusive radius; DSM−DTM with nodata (card S4) | [ ] |
-| 5 | Retrieval recall@8 > 0.8 on dev semantics questions; search < 300 ms per query on CPU (card T2) | [ ] |
-| 6 | Dev set ≥ 90 rows; `devset_check.py` passes (card T3) | [ ] |
+| 5 | Retrieval recall@8 > 0.8 on dev semantics questions; search < 300 ms per query on CPU (card T2) | [x] |
+| 6 | Dev set ≥ 90 rows; `devset_check.py` passes (card T3) | [x] |
 | 7 | ≥ 80% of dev plans execute without error after at most 2 repairs (card S3) | [ ] |
 | 8 | `uv run mqa evaluate` on a full dev run, score table pasted, per domain and per qtype | [ ] |
 
