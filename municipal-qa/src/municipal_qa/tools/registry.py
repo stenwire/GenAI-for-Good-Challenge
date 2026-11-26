@@ -57,7 +57,7 @@ def op(name: str, description: str, properties: dict, required: list[str], group
     return deco
 
 
-MODULES = ("table_ops", "calc", "spatial_ops")
+MODULES = ("table_ops", "calc", "spatial_ops", "raster_ops")
 
 
 def load_all() -> dict[str, OpSpec]:
