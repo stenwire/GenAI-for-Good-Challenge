@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -56,7 +57,7 @@ def op(name: str, description: str, properties: dict, required: list[str], group
     return deco
 
 
-MODULES = ("table_ops",)
+MODULES = ("table_ops", "calc")
 
 
 def load_all() -> dict[str, OpSpec]:
@@ -164,15 +165,19 @@ def _load(src, table, prof: SourceProfile, conv: Conventions, cols: tuple | None
     return get_reader(src).load_table(src, table)
 
 
+_REF = re.compile(r"^\$([A-Za-z_]\w*)(?:\.(.+))?$")
+
+
 def resolve(value: Any, env: dict[str, ToolResult]) -> Any:
     """`$name` → the step's first fact, `$name.fact` → that fact, recursively in lists/dicts."""
     if isinstance(value, list):
         return [resolve(v, env) for v in value]
     if isinstance(value, dict):
         return {k: resolve(v, env) for k, v in value.items()}
-    if not (isinstance(value, str) and value.startswith("$")):
+    m = _REF.match(value) if isinstance(value, str) else None
+    if not m:
         return value
-    name, _, fact = value[1:].partition(".")
+    name, fact = m.group(1), m.group(2)
     if name not in env:
         raise OpError(f"unknown reference {value}; saved steps: {sorted(env)}")
     res = env[name]
