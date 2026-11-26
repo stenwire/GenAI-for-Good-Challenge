@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from dotenv import dotenv_values
@@ -109,6 +109,7 @@ class RetrievalConfig(BaseModel):
 
 
 class PipelineConfig(BaseModel):
+    mode: Literal["planner", "baseline"] = "planner"
     max_repairs: int = 2
     max_extra_plans: int = 2
     enable_rewrite: bool = True

@@ -213,8 +213,8 @@ def evaluate(
     import json
 
     from municipal_qa.config import load_config
-    from municipal_qa.evaluation.report import render
-    from municipal_qa.evaluation.scorer import evaluate_run
+    from municipal_qa.evaluation.report import render, render_plans
+    from municipal_qa.evaluation.scorer import evaluate_run, load_records
 
     cfg = load_config()
     run_dir = cfg.artifacts_dir / "runs" / run_id
@@ -227,6 +227,9 @@ def evaluate(
     split = split or "dev"
     typer.echo(f"# Evaluation of {run_id} ({split})\n")
     typer.echo(render(evaluate_run(run_dir, split, cfg)))
+    plans = render_plans(load_records(run_dir))
+    if plans:
+        typer.echo("\n" + plans)
 
 
 @app.command()

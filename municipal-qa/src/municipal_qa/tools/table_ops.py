@@ -102,9 +102,31 @@ def _cmp(x, op: str, v) -> bool:
     return {">": a > b, ">=": a >= b, "<": a < b, "<=": a <= b}[op]
 
 
+OP_ALIASES = {
+    "==": "=", "eq": "=", "equal": "=", "equals": "=", "is": "=", "ne": "!=", "<>": "!=",
+    "not_equal": "!=", "gt": ">", "ge": ">=", "gte": ">=", "lt": "<", "le": "<=", "lte": "<=",
+    "like": "icontains", "includes": "icontains", "has": "icontains", "starts_with": "startswith",
+    "isnull": "is_null", "is null": "is_null", "notnull": "not_null", "is not null": "not_null",
+    "not in": "not_in",
+}  # fmt: skip
+NULL_WORDS = {"null", "none", "nan", "", "empty", "blank"}
+
+
+def _clause(w: dict) -> dict:
+    op_ = str(w.get("op", "=")).strip().lower()
+    op_ = OP_ALIASES.get(op_, op_)
+    v = val(w.get("value"))
+    if op_ in ("=", "!=") and (
+        v is None or (isinstance(v, str) and v.strip().lower() in NULL_WORDS)
+    ):
+        op_ = "is_null" if op_ == "=" else "not_null"
+    return {**w, "op": op_}
+
+
 def apply_where(df: pd.DataFrame, where: list | None) -> pd.DataFrame:
     if not where:
         return df
+    where = [_clause(w) if isinstance(w, dict) else w for w in where]
     mask = pd.Series(True, index=df.index)
     for w in where:
         if not isinstance(w, dict) or "column" not in w:
@@ -332,6 +354,9 @@ def op_get_cell(ctx: ExecContext, source_id, sheet, ref, value_mode=None):
     loc = Locator(source_id=source_id, kind="cell", text=cell_locator_text(sheet, c.ref))
     note = f"stored {c.stored!r}, displayed {c.displayed!r}" if c.stored != c.displayed else None
     shown = c.displayed if mode == "displayed" and c.displayed is not None else text(v)
+    d = to_decimal(v) if mode != "displayed" and isinstance(v, int | float) else None
+    if d is not None:
+        shown = display(d, ctx.conventions)  # stored value, rounded once for reporting
     if v is not None and not isinstance(v, int | float | str | bool):
         v = str(v)
     f = Fact(
@@ -354,6 +379,8 @@ def op_get_cell(ctx: ExecContext, source_id, sheet, ref, value_mode=None):
     ["source_id", "sheet", "range"],
 )
 def get_range(ctx: ExecContext, source_id, sheet, range):  # noqa: A002
+    if ctx.profile(source_id).kind != "workbook":
+        raise OpError(f"{source_id} is not a workbook; use table ops on its columns")
     a, _, b = range.partition(":")
     r1, c1 = parse_ref(a)
     r2, c2 = parse_ref(b or a)
@@ -379,6 +406,8 @@ def get_range(ctx: ExecContext, source_id, sheet, range):  # noqa: A002
     ["source_id", "text"],
 )
 def find_cells(ctx: ExecContext, source_id, text, sheet=None):  # noqa: F811 (arg name is the schema's)
+    if ctx.profile(source_id).kind != "workbook":
+        raise OpError(f"{source_id} is not a workbook; use table ops on its columns")
     q = str(val(text)).casefold()
     hits = []
     for sh, cells in read_cells(ctx.source(source_id).path).items():
@@ -1079,3 +1108,100 @@ def sql(ctx: ExecContext, query):
             )
     facts.append(count_fact("rows", len(out), "rows", f"the query returns {len(out):,} rows", loc))
     return ok("sql", {}, facts, out.head(20).to_string())
+
+
+def _label(cells_by_row: dict[int, list], r: int) -> str:
+    for c in cells_by_row.get(r, []):
+        if c.col <= 2 and c.displayed not in (None, ""):
+            return str(c.displayed)
+    return ""
+
+
+def _match(want: str, have: str) -> int:
+    """2 = same after normalising, 1 = one contains the other, 0 = no match."""
+    from municipal_qa.tools.registry import loose_name
+
+    a, b = loose_name(want), loose_name(have)
+    if not a or not b:
+        return 0
+    return 2 if a == b else 1 if (a in b or b in a) and min(len(a), len(b)) >= 3 else 0
+
+
+@op("cell_lookup", "spreadsheet cell by row label and column header (block = section heading)",
+    {"source_id": S, "sheet": S, "row": S, "column": S, "block": S,
+     "value_mode": {"type": "string", "enum": ["stored", "displayed"]}},
+    ["source_id", "sheet", "row", "column"])  # fmt: skip
+def cell_lookup(ctx, source_id, sheet, row, column, block=None, value_mode=None):
+    src = ctx.source(source_id)
+    if ctx.profile(source_id).kind != "workbook":
+        raise OpError(f"{source_id} is not a workbook")
+    sheets = read_cells(src.path)
+    if sheet not in sheets:
+        low = {s.lower(): s for s in sheets}
+        if str(sheet).lower() not in low:
+            raise OpError(f"no sheet {sheet!r}; sheets: {list(sheets)}")
+        sheet = low[str(sheet).lower()]
+    cells = sheets[sheet]
+    by_row: dict[int, list] = {}
+    for c in cells:
+        by_row.setdefault(c.row, []).append(c)
+    for r in by_row.values():
+        r.sort(key=lambda c: c.col)
+    labels = {r: _label(by_row, r) for r in sorted(by_row)}
+    notes = []
+
+    def row_hit(x):
+        return any(_match(str(val(x)), lab) for lab in labels.values())
+
+    if not row_hit(row) and row_hit(column):
+        row, column = column, row
+        notes.append("row and column labels swapped to match the sheet")
+    if block and not any(_match(str(val(block)), lab) for lab in labels.values()):
+        notes.append(f"block {block!r} not found in the sheet; ignored")
+        block = None
+    rows = [(r, _match(str(val(row)), lab)) for r, lab in labels.items()]
+    best = max((s for _, s in rows), default=0)
+    cand = [r for r, s in rows if s == best and best]
+    also: list[int] = []
+    if block:
+        heads = [h for h, lab in labels.items() if _match(str(val(block)), lab) == 2] or [
+            h for h, lab in labels.items() if _match(str(val(block)), lab)
+        ]
+        firsts = []
+        for h in heads:
+            after = [r for r in cand if r > h]
+            if after and min(after) not in firsts:
+                firsts.append(min(after))
+        cand, also = firsts[:1], firsts[1:]
+    if len(cand) != 1:
+        shown = "; ".join(f"row {r}: {lab}" for r, lab in labels.items() if lab)[:900]
+        why = (
+            "no row matches"
+            if not cand
+            else f"{len(cand)} rows match (rows {cand[:8]}); give block"
+        )
+        raise OpError(f"cell_lookup: {why} {row!r} in sheet {sheet}. Row labels: {shown}")
+    r = cand[0]
+    heads = [c for c in cells if c.row < r and _match(str(val(column)), str(c.displayed or ""))]
+    if not heads:
+        hdr = sorted({str(c.displayed) for c in cells if c.row < r and isinstance(c.stored, str)})[
+            :40
+        ]
+        raise OpError(f"cell_lookup: no column header {column!r} above row {r}; headers: {hdr}")
+    top = max(_match(str(val(column)), str(c.displayed)) for c in heads)
+    head = max((c for c in heads if _match(str(val(column)), str(c.displayed)) == top),
+               key=lambda c: c.row)  # fmt: skip
+    ref = f"{col_letter(head.col)}{r}"
+    res = op_get_cell(ctx, source_id, sheet, ref, value_mode)
+    f = res.facts[0]
+    if also:
+        notes.append(f"later blocks also match rows {also[:5]}")
+    if notes:
+        f.note = "; ".join(x for x in [f.note, *notes] if x)
+    where = f"{labels[r]} / {head.displayed}"
+    f.claim = f"{src.original_file} sheet {sheet} cell {ref} ({where}) is {f.display}"
+    res.op = "cell_lookup"
+    res.preview = f"{sheet}!{ref}: row {r} '{labels[r]}', column '{head.displayed}'; " + (
+        res.preview or ""
+    )
+    return res

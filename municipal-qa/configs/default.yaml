@@ -26,6 +26,7 @@ retrieval:
   chunk_chars: 900
   chunk_overlap: 150
 pipeline:
+  mode: planner        # planner: route -> plan -> execute -> compose; baseline: M1 retrieve + compose
   max_repairs: 2
   max_extra_plans: 2
   enable_rewrite: true

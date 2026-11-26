@@ -44,6 +44,8 @@ def env(tmp_path, monkeypatch):
         "SRC_cccccccccccc": _info("SRC_cccccccccccc", raster),
     }
     cfg = load_config(env_file=tmp_path / "none.env")
+    # These tests pin the M1 baseline path; the planner path has tests/test_planner.py.
+    cfg = cfg.model_copy(update={"pipeline": cfg.pipeline.model_copy(update={"mode": "baseline"})})
     q = Question(
         id="q1",
         case_id="c1",

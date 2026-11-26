@@ -1,4 +1,4 @@
-"""Per-question entry point. Baseline (plan §12): retrieve, compose once, code-built evidence."""
+"""Per-question entry point (plan §6.2): route, plan, execute, compose; or the M1 baseline."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from municipal_qa.llm.prompts import render_prompt
 from municipal_qa.pipeline import evidence
 from municipal_qa.pipeline.context import parse_conventions
 from municipal_qa.retrieval.bm25 import PassageStore, search
-from municipal_qa.schema import AnswerRecord, Passage, Question, SourceInfo
+from municipal_qa.schema import AnswerRecord, Passage, Plan, Question, SourceInfo
 
 MAX_ANSWER_CHARS = 1500
 SOURCE_LINE_CHARS = 160
@@ -26,9 +26,19 @@ class Deps:
     client: LLMClient | None
     store: PassageStore = field(init=False)
     cache_dir: Path | None = None
+    profiles: object = None
+    retriever: object = None
 
     def __post_init__(self) -> None:
         self.store = PassageStore(self.manifest, self.cache_dir)
+        if self.cfg.pipeline.mode == "planner":
+            from municipal_qa.profiling.profile import ProfileStore
+            from municipal_qa.retrieval.index import Retriever
+
+            self.profiles = self.profiles or ProfileStore(self.cfg, self.manifest)
+            self.retriever = self.retriever or Retriever(
+                self.cfg, self.profiles, self.client, passages=self.store
+            )
 
 
 def fallback_text(q: Question) -> str:
@@ -110,6 +120,17 @@ def _compose(q: Question, passages: list[Passage], deps: Deps, budget: QuestionB
 
 def answer_question(q: Question, deps: Deps) -> AnswerRecord:
     """Never raises and never returns a blank answer (plan §6.10)."""
+    if deps.cfg.pipeline.mode == "planner":
+        try:
+            return _answer_planned(q, deps)
+        except Exception as e:  # noqa: BLE001
+            rec = _answer_baseline(q, deps)
+            rec.error = "; ".join(x for x in [f"planner: {type(e).__name__}: {e}", rec.error] if x)
+            return rec
+    return _answer_baseline(q, deps)
+
+
+def _answer_baseline(q: Question, deps: Deps) -> AnswerRecord:
     budget = QuestionBudget(deps.cfg.budget.max_calls, deps.cfg.budget.max_generated_tokens)
     passages: list[Passage] = []
     errors: list[str] = []
@@ -157,3 +178,114 @@ def answer_question(q: Question, deps: Deps) -> AnswerRecord:
             fallback_used=True,
             error=f"record: {type(e).__name__}: {e}",
         )
+
+
+# ---------- planner path (plan §6.2) ----------
+
+TEXT_QTYPES = {"semantics", "insufficient"}
+FACT_LINES = 40
+FACT_CHARS = 5000
+
+
+def _facts_text(pairs) -> str:
+    rows = []
+    for name, f in pairs[:FACT_LINES]:
+        note = f" [{f.note}]" if f.note else ""
+        rows.append(f"- {name}.{f.name}: {f.display}{note} — {' '.join(f.claim.split())[:200]}")
+    return "\n".join(rows)[:FACT_CHARS] or "(no computed facts)"
+
+
+def _compose_planned(q, route, conv, pairs, passages, deps, budget) -> str:
+    from municipal_qa.pipeline.planner import _subs, conventions_text
+
+    prompt = render_prompt(
+        "compose",
+        conventions=conventions_text(conv),
+        sub_questions=_subs(route),
+        premise=route.premise_to_check or "none",
+        facts=_facts_text(pairs),
+        excerpts=_excerpts(passages[:6]),
+        question=q.question,
+    )
+    text, _ = deps.client.chat([{"role": "user", "content": prompt}], "compose", budget)
+    return clean_answer(text)
+
+
+def _answer_planned(q: Question, deps: Deps) -> AnswerRecord:
+    from municipal_qa.pipeline import executor, planner, router
+    from municipal_qa.profiling.profile import render_profiles
+    from municipal_qa.tools.registry import ExecContext
+
+    cfg = deps.cfg
+    budget = QuestionBudget(cfg.budget.max_calls, cfg.budget.max_generated_tokens)
+    errors: list[str] = []
+    conv = parse_conventions(q.context, q.question)
+    profiles = deps.profiles.get_many(q.source_ids)
+    k = cfg.retrieval.k_final
+    try:
+        passages = deps.retriever.search(q.question, q.source_ids, k=k)
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"retrieval: {type(e).__name__}: {e}")
+        passages = search(deps.store, q.question, q.source_ids, k=k)
+    route = None
+    if deps.client is not None:
+        try:
+            route = router.combine(router.route(q, profiles, passages, deps.client, budget), q)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"route: {type(e).__name__}: {e}")
+    route = route or router.rule_route(q)
+    qtype = route.qtype.value
+    if qtype in TEXT_QTYPES:
+        try:
+            passages = deps.retriever.search(q.question, q.source_ids, k=k, qtype="semantics")
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"retrieval: {type(e).__name__}: {e}")
+    docs_suffice = qtype in TEXT_QTYPES and any(p.kind != "body" for p in passages)
+    plan, ex = None, None
+    ctx = ExecContext(deps.profiles, conv, list(q.source_ids), retriever=deps.retriever)
+    if deps.client is not None and not docs_suffice:
+        profiles_text = render_profiles(profiles, 6000, q.question)
+        try:
+            plan = planner.plan(q, route, conv, profiles_text, deps.client, budget)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"plan: {type(e).__name__}: {e}")
+    if plan is not None:
+        ops = planner.ops_for(qtype)
+
+        def repair(step, error):
+            sid = next((step.args.get(k) for k in executor.SOURCE_KEYS if step.args.get(k)), None)
+            one = [p for p in profiles if p.source.source_id == sid] or profiles
+            text = render_profiles(one, 2500, q.question)
+            saved = sorted(ctx.env)
+            return planner.repair(q, step, error, saved, text, deps.client, budget, ops)
+
+        ex = executor.execute(plan, ctx, repair, cfg.pipeline.max_repairs)
+        done = zip(ex.steps, ex.results, strict=True)
+        errors += [f"step {s.save_as} {s.op}: {r.error}" for s, r in done if not r.ok]
+    pairs = ex.facts() if ex else []
+    answer, fallback = "", True
+    if deps.client is not None and (pairs or passages):
+        try:
+            answer = _compose_planned(q, route, conv, pairs, passages, deps, budget)
+            fallback = not answer
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"compose: {type(e).__name__}: {e}")
+    facts = [f for _, f in pairs]
+    if not answer and facts:
+        answer = " ".join(f.claim.rstrip(".") + "." for f in facts[:3])
+    lines = evidence.for_answer(answer, facts, passages, text_first=qtype in TEXT_QTYPES)
+    if not answer:
+        answer, lines = fallback_text(q), lines[:1]
+    return AnswerRecord(
+        question_id=q.id,
+        answer=answer,
+        evidence=lines,
+        route=route,
+        plan=Plan(steps=ex.steps, rationale=plan.rationale) if ex else plan,
+        results=ex.results if ex else [],
+        calls=budget.records(),
+        total_calls=budget.calls_used,
+        total_generated_tokens=budget.tokens_used,
+        fallback_used=fallback,
+        error="; ".join(errors) or None,
+    )

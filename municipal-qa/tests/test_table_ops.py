@@ -218,6 +218,11 @@ def test_workbook_cells_ranges_and_column_letters(ctx):
     assert m["max"].locators[0].text == "sheet Data, cell C5" and m["at"].value == "Espoo"
 
 
+def test_workbook_ops_refuse_other_sources(ctx):
+    r = run(ctx, "find_cells", source_id=A, text="Oak")
+    assert not r.ok and "is not a workbook" in r.error
+
+
 def test_row_wise_max_json_and_sql(ctx):
     r = facts(run(ctx, "row_wise_max", source_id=J, columns=["a", "b", "c"], label_column="t"))
     assert r["max_row_total"].value == 12 and r["at"].value == "00:15"
@@ -278,3 +283,45 @@ def test_train_1bbb3964_set_compare_and_1d78cef6_lookup(data_cfg):
     )
     assert (d["made_date"].value, d["confirmed_date"].value) == ("2018-04-20", "2018-05-25")
     assert d["made_date"].locators[0].text == "reference=TPO453, column made_date"
+
+
+def test_cell_lookup_by_labels_and_block(tmp_path, monkeypatch):
+    monkeypatch.setenv("MQA_DATA_DIR", str(tmp_path))
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Results"
+    rows = [["Energy (GWh)"], ["Area", 2023, 2024], ["Helsinki"], ["Heat", 10.25, 11.5],
+            ["Total", 20, 21], ["Espoo"], ["Heat", 30, 31], ["Total", 40, 41.256],
+            ["Grand total", 60, 62]]  # fmt: skip
+    for r in rows:
+        ws.append(r)
+    wb.save(tmp_path / "blocks.xlsx")
+    sid = "SRC_eeeeeeeeeeee"
+    manifest = {sid: _info(sid, tmp_path / "blocks.xlsx")}
+    cfg = load_config(env_file=tmp_path / "none.env").model_copy(
+        update={"artifacts_dir": tmp_path / "artifacts"}
+    )
+    ctx = ExecContext(
+        ProfileStore(cfg, manifest), Conventions(raw_context="", value_mode="stored"), [sid]
+    )
+    f = facts(run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="total", column="2024",
+                  block="Espoo"))["value"]  # fmt: skip
+    assert (
+        f.value == 41.256
+        and f.display == "41.26"
+        and f.locators[0].text == "sheet Results, cell C8"
+    )
+    h = facts(run(ctx, "cell_lookup", source_id=sid, sheet="results", row="Heat", column="2023",
+                  block="Helsinki"))["value"]  # fmt: skip
+    assert h.locators[0].text == "sheet Results, cell B4" and "(Heat / 2023)" in h.claim
+    amb = run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="Total", column="2024")
+    assert not amb.ok and "2 rows match" in amb.error and "row 6: Espoo" in amb.error
+    sw = facts(run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="2024", column="Total",
+                   block="Espoo"))["value"]  # fmt: skip
+    assert sw.locators[0].text == "sheet Results, cell C8" and "swapped" in sw.note
+    nb = facts(run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="Grand total",
+                   column="2024", block="Vantaa"))["value"]  # fmt: skip
+    assert "block 'Vantaa' not found" in nb.note and nb.locators[0].text == "sheet Results, cell C9"
+    miss = run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="Heat", column="2030",
+               block="Espoo")  # fmt: skip
+    assert not miss.ok and "no column header '2030'" in miss.error

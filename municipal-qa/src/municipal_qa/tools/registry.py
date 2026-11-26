@@ -245,14 +245,26 @@ def check_args(spec: OpSpec, args: dict, ctx: ExecContext) -> dict:
     return out
 
 
+_NOTE = re.compile(r"\[[^\]]*\]|\([^)]*note[^)]*\)", re.I)
+
+
+def loose_name(s: str) -> str:
+    """Ignores case, separators and bracketed notes: `confirmed_date` ~ `Confirmed-date [n2]`."""
+    return re.sub(r"[\s_\-.:/]+", "", _NOTE.sub("", str(s)).lower())
+
+
 def _check_columns(v: Any, cols: list[str], sid: str, table: str) -> Any:
     if isinstance(v, list):
         return [_check_columns(x, cols, sid, table) for x in v]
     if not isinstance(v, str) or v in cols:
         return v
-    low = {c.lower().strip(): c for c in cols}
-    if v.lower().strip() in low:
-        return low[v.lower().strip()]
+    for key in (lambda s: s.lower().strip(), loose_name):
+        idx: dict[str, list[str]] = {}
+        for c in cols:
+            idx.setdefault(key(c), []).append(c)
+        hit = idx.get(key(v), [])
+        if len(hit) == 1:
+            return hit[0]
     shown = ", ".join(cols[:40]) + (" ..." if len(cols) > 40 else "")
     raise OpError(f"no column {v!r} in {sid} table {table}; columns: {shown}")
 

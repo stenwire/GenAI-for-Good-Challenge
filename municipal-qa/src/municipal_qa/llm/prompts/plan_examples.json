@@ -1,0 +1,215 @@
+[
+ {
+  "id": "dev-001",
+  "qtype": "compare",
+  "question": "How do North West's bus passenger journeys in the year ending March 2025 compare with the year ending March 2019, as a percentage of the 2019 total?",
+  "steps": [
+   {
+    "op": "cell_lookup",
+    "args": {
+     "source_id": "SRC_f9068c4ee468",
+     "sheet": "BUS01a",
+     "row": "2025",
+     "column": "North West"
+    },
+    "save_as": "y2025"
+   },
+   {
+    "op": "cell_lookup",
+    "args": {
+     "source_id": "SRC_f9068c4ee468",
+     "sheet": "BUS01a",
+     "row": "2019",
+     "column": "North West"
+    },
+    "save_as": "y2019"
+   },
+   {
+    "op": "share",
+    "args": {
+     "part": "$y2025",
+     "total": "$y2019",
+     "label": "2025 as % of 2019"
+    },
+    "save_as": "pct"
+   }
+  ]
+ },
+ {
+  "id": "dev-022",
+  "qtype": "compare",
+  "question": "How much did Vantaa's total energy consumption change from 2023 to 2024, in GWh and percent?",
+  "steps": [
+   {
+    "op": "cell_lookup",
+    "args": {
+     "source_id": "SRC_d0ba40e73d2c",
+     "sheet": "Tulokset",
+     "block": "Vantaa",
+     "row": "Yhteensä",
+     "column": "2023"
+    },
+    "save_as": "v2023"
+   },
+   {
+    "op": "cell_lookup",
+    "args": {
+     "source_id": "SRC_d0ba40e73d2c",
+     "sheet": "Tulokset",
+     "block": "Vantaa",
+     "row": "Yhteensä",
+     "column": "2024"
+    },
+    "save_as": "v2024"
+   },
+   {
+    "op": "percent_change",
+    "args": {
+     "old": "$v2023",
+     "new": "$v2024",
+     "label": "Vantaa total"
+    },
+    "save_as": "change"
+   }
+  ]
+ },
+ {
+  "id": "dev-024",
+  "qtype": "aggregate",
+  "question": "What share of Helsinki's total energy consumption in 2024 was district heating (Kaukolämpö)?",
+  "steps": [
+   {
+    "op": "cell_lookup",
+    "args": {
+     "source_id": "SRC_d0ba40e73d2c",
+     "sheet": "Tulokset",
+     "block": "Helsinki",
+     "row": "Kaukolämpö",
+     "column": "2024"
+    },
+    "save_as": "dh"
+   },
+   {
+    "op": "cell_lookup",
+    "args": {
+     "source_id": "SRC_d0ba40e73d2c",
+     "sheet": "Tulokset",
+     "block": "Helsinki",
+     "row": "Yhteensä",
+     "column": "2024"
+    },
+    "save_as": "total"
+   },
+   {
+    "op": "share",
+    "args": {
+     "part": "$dh",
+     "total": "$total"
+    },
+    "save_as": "share"
+   }
+  ]
+ },
+ {
+  "id": "dev-042",
+  "qtype": "count",
+  "question": "How many tree records are in tpo-trees.csv?",
+  "steps": [
+   {
+    "op": "count_rows",
+    "args": {
+     "source_id": "SRC_013eda19f72a"
+    },
+    "save_as": "n"
+   }
+  ]
+ },
+ {
+  "id": "dev-043",
+  "qtype": "data_quality",
+  "question": "How many tree records in tpo-trees.csv have no confirmed-date, and what share is that?",
+  "steps": [
+   {
+    "op": "count_nulls",
+    "args": {
+     "source_id": "SRC_013eda19f72a",
+     "columns": [
+      "confirmed-date"
+     ]
+    },
+    "save_as": "nulls"
+   },
+   {
+    "op": "share",
+    "args": {
+     "part": "$nulls.confirmed-date.blank",
+     "total": "$nulls.total"
+    },
+    "save_as": "pct"
+   }
+  ]
+ },
+ {
+  "id": "dev-048",
+  "qtype": "spatial",
+  "question": "What is the area of zone 1907/A1 in hectares, measured in British National Grid metres?",
+  "steps": [
+   {
+    "op": "area",
+    "args": {
+     "source_id": "SRC_4b81bb5b1c48",
+     "key_column": "reference",
+     "value": "1907/A1",
+     "unit": "ha",
+     "crs": "EPSG:27700"
+    },
+    "save_as": "area"
+   }
+  ]
+ },
+ {
+  "id": "dev-051",
+  "qtype": "lookup",
+  "question": "When was TPO401 made and confirmed, and how many days passed between them?",
+  "steps": [
+   {
+    "op": "lookup_row",
+    "args": {
+     "source_id": "SRC_5b6ce878f23c",
+     "key_column": "reference",
+     "value": "TPO401",
+     "columns": [
+      "made_date",
+      "confirmed_date"
+     ]
+    },
+    "save_as": "order"
+   },
+   {
+    "op": "date_diff",
+    "args": {
+     "start": "$order.made_date",
+     "end": "$order.confirmed_date"
+    },
+    "save_as": "days"
+   }
+  ]
+ },
+ {
+  "id": "dev-059",
+  "qtype": "data_quality",
+  "question": "Are any references present in only one of tpo-trees.csv and trees.gpkg, and are there duplicates?",
+  "steps": [
+   {
+    "op": "set_compare",
+    "args": {
+     "source_a": "SRC_013eda19f72a",
+     "column_a": "reference",
+     "source_b": "SRC_5ddbc42bcd4a",
+     "column_b": "reference"
+    },
+    "save_as": "cmp"
+   }
+  ]
+ }
+]
