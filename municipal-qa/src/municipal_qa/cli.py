@@ -41,9 +41,38 @@ def setup_data(
 @app.command()
 def profile(
     source: Annotated[str | None, typer.Option(help="Profile one source ID only.")] = None,
+    workers: Annotated[int, typer.Option(help="Parallel worker processes.")] = 4,
+    force: Annotated[bool, typer.Option("--force", help="Rebuild cached profiles.")] = False,
 ) -> None:
     """Build or refresh the source profile cache."""
-    _not_implemented("profile")
+    import time
+
+    from municipal_qa.config import load_config
+    from municipal_qa.data.manifest import load_manifest
+    from municipal_qa.profiling.profile import ProfileStore, profile_summary
+
+    cfg = load_config()
+    manifest = load_manifest(cfg)
+    if source:
+        if source not in manifest:
+            typer.echo(f"unknown source {source}", err=True)
+            raise typer.Exit(code=1)
+        manifest = {source: manifest[source]}
+    store = ProfileStore(cfg, manifest)
+    t0 = time.perf_counter()
+    if force:
+        for sid in manifest:
+            store.path(sid).unlink(missing_ok=True)
+    store.build_all(workers=workers)
+    info = profile_summary(store)
+    kinds = ", ".join(f"{k} {n}" for k, n in info["kinds"].items())
+    typer.echo(
+        f"profiled {len(manifest)} sources in {time.perf_counter() - t0:.1f}s -> "
+        f"{store.cache_dir}\nkinds: {kinds}\nfallback (binary with warning): "
+        f"{len(info['fallbacks'])}"
+    )
+    for sid, name, why in info["fallbacks"]:
+        typer.echo(f"  {sid} {name}: {why}")
 
 
 @app.command()
