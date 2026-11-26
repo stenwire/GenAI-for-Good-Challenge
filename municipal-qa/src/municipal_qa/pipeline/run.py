@@ -13,6 +13,7 @@ from importlib import metadata
 from pathlib import Path
 
 from municipal_qa.config import PROJECT_ROOT, Config
+from municipal_qa.retrieval.bm25 import code_fingerprint
 from municipal_qa.schema import AnswerRecord, Question
 
 KEY_PACKAGES = [
@@ -52,7 +53,7 @@ def git_info() -> dict:
 
 def new_run_id(now: dt.datetime | None = None) -> str:
     now = now or dt.datetime.now()
-    return f"{now:%Y%m%d-%H%M}-{git_info()['short'] or 'nogit'}"
+    return f"{now:%Y%m%d-%H%M%S}-{git_info()['short'] or 'nogit'}"
 
 
 def _versions() -> dict[str, str]:
@@ -78,6 +79,7 @@ def write_manifest(run_dir: Path, cfg: Config, split: str, model: dict, extra: d
             "python": sys.version.split()[0],
             "platform": platform.platform(),
             "packages": _versions(),
+            "passage_cache_code": code_fingerprint(),
             **extra,
         }
     )

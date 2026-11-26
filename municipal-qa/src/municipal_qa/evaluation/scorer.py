@@ -11,6 +11,7 @@ from pathlib import Path
 import pandas as pd
 from rapidfuzz import fuzz, utils
 
+from municipal_qa.pipeline.evidence import line as evidence_line
 from municipal_qa.schema import AnswerRecord, Question, SourceInfo
 
 TEXT_FULL = 85
@@ -146,7 +147,7 @@ def parse_reference_evidence(
 
 def reference_evidence_lines(q: Question, manifest: dict[str, SourceInfo]) -> list[str]:
     pairs = parse_reference_evidence(q.reference_evidence or [], q, manifest)
-    return [f"{sid} | {loc} | reference evidence" for sid, loc in pairs if sid]
+    return [evidence_line(sid, loc, "reference evidence") for sid, loc in pairs if sid]
 
 
 def _cited(record: AnswerRecord) -> list[tuple[str, str]]:

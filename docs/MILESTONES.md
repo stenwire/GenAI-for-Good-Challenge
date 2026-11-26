@@ -23,10 +23,23 @@ Hard external dates (from the brief, not movable):
 - Up to 1 Zindi submission per day, 20 in total. Uploading is done by the user,
   never by `/implement`.
 
+**Submissions are real runs only (D-042).** Slot 1 of 20 went on the
+walkthrough when the user joined, so at most 19 remain. Every later upload is a
+full, validated, budget-checked Test run of the pipeline: no placeholder,
+format-check or test uploads. Each milestone has one submission checkpoint,
+owned by the user; `/implement` hands over the file and the user uploads it and
+reports the leaderboard score for `SUBMISSIONS.md`. A checkpoint is skipped, with
+the reason recorded, when its dev score does not beat the last uploaded run.
+
+| Slots | Count |
+|---|---|
+| Used | 1 (walkthrough) |
+| Remaining | 19 at most |
+
 | Milestone | Name | Plan cards | Target | Depends on | Status |
 |---|---|---|---|---|---|
 | M0 | Foundation | M1, M2, M6, M7, S1, S2 | 27 Nov 2026 | - | complete |
-| M1 | Baseline Submission | M3, T1, T4, S5 (basic), T3 (≥ 60) | 30 Nov 2026 | M0 | awaiting verify |
+| M1 | Baseline Submission | M3, T1, T4, S5 (basic), T3 (≥ 60) | 30 Nov 2026 | M0 | in progress |
 | M2 | Tools and Planner | M4, M5, T2, T3 (≥ 90), S3, S4 | 5 Dec 2026 | M1 | not started |
 | M3 | Feature Freeze | S5 (complete), M8 (draft) | 9 Dec 2026 | M2 | not started |
 | M4 | Final Package | M8 | 12 Dec 2026 | M3 | not started |
@@ -85,6 +98,8 @@ but every one of the 600 answers is non-blank and the file is valid.
 
 **Plan cards:** M3, T1, T4, S5 (basic), T3 (≥ 60 rows)
 
+**Submission checkpoint:** T-115, the baseline run `20261125-2323-f27f59e` (dev 0.0975).
+
 ### Definition of Done
 
 | # | Criterion | State |
@@ -114,6 +129,8 @@ with JSON-schema-constrained output and repair.
 
 **Plan cards:** M4, M5, T2, T3 (≥ 90 rows), S3, S4
 
+**Submission checkpoint:** T-212, a full Test run of the planner pipeline after T-210.
+
 ### Definition of Done
 
 | # | Criterion | State |
@@ -141,6 +158,8 @@ offline reproduction that mirrors the organisers' rerun environment.
 
 **Plan cards:** S5 (complete), M8 (draft)
 
+**Submission checkpoint:** T-307, the feature-frozen, size-controlled run after T-304 and T-306.
+
 ### Definition of Done
 
 | # | Criterion | State |
@@ -166,6 +185,8 @@ Delivers the final full run, the two selected submissions, and a code package
 ready for the 48-hour code request.
 
 **Plan cards:** M8
+
+**Submission checkpoint:** T-406, the T-401 final run before 13 Dec 2026 23:59 EST, then the final two chosen in T-402.
 
 ### Definition of Done
 

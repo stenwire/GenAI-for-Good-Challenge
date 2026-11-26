@@ -100,6 +100,7 @@ class RetrievalConfig(BaseModel):
     k_bm25: int = 30
     k_dense: int = 30
     k_final: int = 8
+    docs_first: int = 3
     chunk_chars: int = 900
     chunk_overlap: int = 150
 
@@ -108,6 +109,7 @@ class PipelineConfig(BaseModel):
     max_repairs: int = 2
     max_extra_plans: int = 2
     enable_rewrite: bool = True
+    evidence_from_top: int = 4
 
 
 class RunConfig(BaseModel):

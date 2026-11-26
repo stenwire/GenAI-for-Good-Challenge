@@ -96,6 +96,9 @@ def run(
     if resume and not run_dir.exists():
         typer.echo(f"no run {resume} to resume", err=True)
         raise typer.Exit(code=1)
+    if not resume and run_dir.exists():
+        typer.echo(f"run {run_id} already exists; pass --resume {run_id} to continue it", err=True)
+        raise typer.Exit(code=1)
     questions = runner.select(load_questions(cfg, split), ids, limit)
     client = LLMClient(cfg)
     try:
@@ -104,7 +107,7 @@ def run(
         typer.echo(f"FAILED model check: {e}", err=True)
         raise typer.Exit(code=1) from e
     deps = Deps(cfg, load_manifest(cfg), client, cache_dir=cfg.artifacts_dir / "passages")
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir.mkdir(parents=True, exist_ok=bool(resume))
     start = dt.datetime.now().isoformat(timespec="seconds")
     runner.write_manifest(run_dir, cfg, split, model, {"started": start, "status": "running"})
     t0 = time.perf_counter()

@@ -107,3 +107,21 @@ def test_submit_refuses_incomplete_and_writes_valid_file(data_cfg):
         assert shown.exit_code == 0 and "Placeholder." in shown.output
     finally:
         shutil.rmtree(run_dir, ignore_errors=True)
+
+
+def test_run_id_has_seconds_and_run_refuses_existing_dir(data_cfg, monkeypatch):
+    import datetime as dt
+
+    a = runner.new_run_id(dt.datetime(2026, 11, 26, 9, 5, 7))
+    b = runner.new_run_id(dt.datetime(2026, 11, 26, 9, 5, 8))
+    assert a.startswith("20261126-090507-") and a != b
+    run_dir = data_cfg.artifacts_dir / "runs" / "pytest-existing"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "answers.jsonl").write_text("keep\n")
+    monkeypatch.setattr(runner, "new_run_id", lambda: "pytest-existing")
+    try:
+        result = CliRunner().invoke(app, ["run", "--split", "dev", "--limit", "1"])
+        assert result.exit_code == 1 and "already exists" in result.output
+        assert (run_dir / "answers.jsonl").read_text() == "keep\n"
+    finally:
+        shutil.rmtree(run_dir, ignore_errors=True)

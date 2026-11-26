@@ -15,7 +15,6 @@ from municipal_qa.pipeline.context import parse_conventions
 from municipal_qa.retrieval.bm25 import PassageStore, search
 from municipal_qa.schema import AnswerRecord, Passage, Question, SourceInfo
 
-EVIDENCE_FROM_TOP = 4
 MAX_ANSWER_CHARS = 1500
 SOURCE_LINE_CHARS = 160
 
@@ -39,12 +38,32 @@ def fallback_text(q: Question) -> str:
     )
 
 
+_BULLET = re.compile(r"^\s*(?:[-*•+]|\d{1,2}[.)])\s+")
+
+
+def _fold_bullets(lines: list[str]) -> list[str]:
+    """List items become sentences of one paragraph, so no answer line starts with `- `."""
+    out: list[str] = []
+    for ln in lines:
+        if not _BULLET.match(ln):
+            out.append(ln)
+            continue
+        item = _BULLET.sub("", ln).strip()
+        if item and item[-1] not in ".!?:;":
+            item += "."
+        if out and out[-1].strip():
+            out[-1] = f"{out[-1].rstrip()} {item}"
+        else:
+            out.append(item)
+    return out
+
+
 def clean_answer(text: str) -> str:
-    """Model text → one safe answer block: no think tags, headings or evidence section."""
+    """Model text → one safe answer block: no think tags, headings, lists or evidence section."""
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S | re.I)
     text = re.split(r"(?im)^\s*#+\s*evidence\b", text)[0]
     lines = [re.sub(r"^\s*#+\s*", "", ln).rstrip() for ln in text.strip().splitlines()]
-    text = "\n".join(lines).strip()
+    text = "\n".join(_fold_bullets(lines)).strip()
     return text[:MAX_ANSWER_CHARS].strip()
 
 
@@ -83,7 +102,10 @@ def answer_question(q: Question, deps: Deps) -> AnswerRecord:
     passages: list[Passage] = []
     errors: list[str] = []
     try:
-        passages = search(deps.store, q.question, q.source_ids, k=deps.cfg.retrieval.k_final)
+        rc = deps.cfg.retrieval
+        passages = search(
+            deps.store, q.question, q.source_ids, k=rc.k_final, docs_first=rc.docs_first
+        )
     except Exception as e:  # noqa: BLE001
         errors.append(f"retrieval: {type(e).__name__}: {e}")
     errors += [
@@ -97,7 +119,7 @@ def answer_question(q: Question, deps: Deps) -> AnswerRecord:
         except Exception as e:  # noqa: BLE001
             errors.append(f"compose: {type(e).__name__}: {e}")
     try:
-        lines = evidence.from_passages(passages[:EVIDENCE_FROM_TOP])
+        lines = evidence.from_passages(passages[: deps.cfg.pipeline.evidence_from_top])
     except Exception as e:  # noqa: BLE001
         errors.append(f"evidence: {type(e).__name__}: {e}")
         lines = []

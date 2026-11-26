@@ -17,6 +17,7 @@ import pandas as pd
 import municipal_qa.readers  # noqa: F401
 from municipal_qa.config import load_config
 from municipal_qa.data.manifest import load_manifest
+from municipal_qa.pipeline.evidence import line
 from municipal_qa.readers.spreadsheet import get_cell
 
 OUT = Path(__file__).with_name("dev_questions.csv")
@@ -141,7 +142,7 @@ def add(domain, qtype, question, answer, evidence, elements):
             "Context": ctx,
             "Source_IDs": json.dumps(srcs),
             "Answer": answer,
-            "Evidence": json.dumps([f"{s} | {loc} | {claim}" for s, loc, claim in evidence]),
+            "Evidence": json.dumps([line(s, loc, claim) for s, loc, claim in evidence]),
             "elements": json.dumps(elements, ensure_ascii=False),
             "qtype": qtype,
         }

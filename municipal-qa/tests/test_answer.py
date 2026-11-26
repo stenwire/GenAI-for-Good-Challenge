@@ -90,7 +90,7 @@ def test_baseline_composes_once_with_code_built_evidence(env):
     assert (rec.total_calls, rec.total_generated_tokens) == (1, 12)
     assert rec.evidence[0].startswith('SRC_aaaaaaaaaaaa | section "Shorthand", line 3 | ')
     assert any(ln.startswith("SRC_bbbbbbbbbbbb | header row |") for ln in rec.evidence)
-    assert (tmp / "cache" / "SRC_aaaaaaaaaaaa.v1.json").exists()
+    assert len(list((tmp / "cache").glob("SRC_aaaaaaaaaaaa.*.json"))) == 1
 
 
 def test_model_text_is_cleaned(env):
@@ -172,3 +172,75 @@ def test_prompt_render_does_not_reexpand_source_text(env):
     )
     assert "contains {question} literally" in text and text.count("REAL Q") == 1
     assert json.dumps(text)
+
+
+def test_passage_cache_invalidated_by_source_or_reader_change(env, monkeypatch):
+    from municipal_qa.retrieval import bm25
+
+    cfg, manifest, _, tmp = env
+    sid, cache = "SRC_aaaaaaaaaaaa", tmp / "cache"
+    reads = []
+    real = bm25.PassageStore._read
+
+    def counting(self, s):
+        reads.append(s)
+        return real(self, s)
+
+    monkeypatch.setattr(bm25.PassageStore, "_read", counting)
+    bm25.PassageStore(manifest, cache).get(sid)
+    bm25.PassageStore(manifest, cache).get(sid)
+    assert reads == [sid]
+    monkeypatch.setattr(bm25, "code_fingerprint", lambda: "reader-code-changed")
+    bm25.PassageStore(manifest, cache).get(sid)
+    assert reads == [sid, sid]
+    changed = {**manifest, sid: manifest[sid].model_copy(update={"sha256": "new"})}
+    bm25.PassageStore(changed, cache).get(sid)
+    assert reads == [sid, sid, sid]
+    assert len(list(cache.glob(f"{sid}.*.json"))) == 3
+
+
+def test_fingerprint_covers_every_reader_module():
+    from municipal_qa.retrieval import bm25
+
+    bm25.code_fingerprint.cache_clear()
+    before = bm25.code_fingerprint()
+    target = bm25._PKG / "readers" / "spreadsheet.py"
+    original = target.read_bytes()
+    try:
+        target.write_bytes(original + b"\n")
+        bm25.code_fingerprint.cache_clear()
+        assert bm25.code_fingerprint() != before
+    finally:
+        target.write_bytes(original)
+        bm25.code_fingerprint.cache_clear()
+    assert bm25.code_fingerprint() == before
+
+
+def test_bullets_fold_into_sentences():
+    text = "Two stops differ:\n- Stop A closed\n* Stop B moved.\n1. Stop C kept\n\nOther line."
+    out = clean_answer(text)
+    assert out == "Two stops differ: Stop A closed. Stop B moved. Stop C kept.\n\nOther line."
+    assert not re.search(r"^\s*(?:[-*•+]|\d{1,2}[.)])\s", out, re.M)
+    assert clean_answer("- Only item") == "Only item."
+    assert clean_answer("-5 degrees is the minimum.") == "-5 degrees is the minimum."
+
+
+def test_tunables_come_from_config(env, monkeypatch):
+    cfg, manifest, q, _ = env
+    seen = {}
+    real = answer_mod.search
+
+    def spy(store, query, sids, k, docs_first):
+        seen.update(k=k, docs_first=docs_first)
+        return real(store, query, sids, k=k, docs_first=docs_first)
+
+    monkeypatch.setattr(answer_mod, "search", spy)
+    cfg = cfg.model_copy(
+        update={
+            "retrieval": cfg.retrieval.model_copy(update={"docs_first": 0, "k_final": 5}),
+            "pipeline": cfg.pipeline.model_copy(update={"evidence_from_top": 1}),
+        }
+    )
+    rec = answer_question(q, Deps(cfg, manifest, _client(cfg)))
+    assert seen == {"k": 5, "docs_first": 0} and len(rec.evidence) == 1
+    assert load_config(env_file=None).retrieval.docs_first == 3

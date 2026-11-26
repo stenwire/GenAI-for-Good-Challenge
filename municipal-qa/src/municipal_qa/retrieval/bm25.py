@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+from functools import cache
 from pathlib import Path
 
 import bm25s
@@ -12,7 +14,17 @@ from municipal_qa.readers.base import UnsupportedFormat, get_reader, is_document
 from municipal_qa.schema import Locator, Passage, SourceInfo
 
 DOC_KINDS = {"doc", "dictionary", "notes_sheet", "metadata"}
-CACHE_VERSION = 1
+CACHE_VERSION = 2
+_PKG = Path(__file__).resolve().parents[1]
+
+
+@cache
+def code_fingerprint() -> str:
+    """Hash of every reader module and this file: any edit invalidates cached passages."""
+    h = hashlib.sha256(f"v{CACHE_VERSION}".encode())
+    for f in sorted([*(_PKG / "readers").glob("*.py"), Path(__file__).resolve()]):
+        h.update(f.name.encode() + b"\0" + f.read_bytes())
+    return h.hexdigest()[:16]
 
 
 def _fallback_passage(src: SourceInfo, reason: str) -> Passage:
@@ -39,7 +51,10 @@ class PassageStore:
         self.errors: dict[str, str] = {}
 
     def _cache_path(self, sid: str) -> Path | None:
-        return self.cache_dir / f"{sid}.v{CACHE_VERSION}.json" if self.cache_dir else None
+        if not self.cache_dir:
+            return None
+        key = hashlib.sha256(f"{self.manifest[sid].sha256}:{code_fingerprint()}".encode())
+        return self.cache_dir / f"{sid}.{key.hexdigest()[:16]}.json"
 
     def get(self, sid: str) -> list[Passage]:
         if sid in self._mem:
