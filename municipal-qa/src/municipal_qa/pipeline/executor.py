@@ -50,6 +50,7 @@ _NULLS = re.compile(r"^\s*(.+?)\s+is\s+(not\s+)?null\s*$", re.I)
 
 
 KEY_ALIASES = {"field": "column", "col": "column", "name": "column", "key": "column",
+               "key_column": "column",
                "operator": "op", "comparison": "op", "val": "value", "equals": "value"}  # fmt: skip
 
 
@@ -90,6 +91,13 @@ def normalise(step: Step, ctx: ExecContext) -> Step:
             args[k] = _source(args[k], ctx)
     if "source" in args and "source_id" not in args:
         args["source_id"] = _source(args.pop("source"), ctx)
+    for skey, tkey in (("source_id", "table"), ("source_a", "table_a"), ("source_b", "table_b")):
+        tab = args.get(tkey)
+        if isinstance(tab, str) and args.get(skey) in ctx.source_ids:
+            other = _source(tab, ctx)
+            if other in ctx.source_ids and other != args[skey]:
+                args[skey] = other  # the "table" named another listed file
+                args.pop(tkey)
     for k in ("where", "where_b", "mask_where"):
         if k in args:
             args[k] = _where(args[k])

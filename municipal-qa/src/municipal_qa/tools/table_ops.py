@@ -1134,7 +1134,7 @@ def _match(want: str, have: str) -> int:
 def cell_lookup(ctx, source_id, sheet, row, column, block=None, value_mode=None):
     src = ctx.source(source_id)
     if ctx.profile(source_id).kind != "workbook":
-        raise OpError(f"{source_id} is not a workbook")
+        return _label_lookup(ctx, source_id, row, column)
     sheets = read_cells(src.path)
     if sheet not in sheets:
         low = {s.lower(): s for s in sheets}
@@ -1173,6 +1173,9 @@ def cell_lookup(ctx, source_id, sheet, row, column, block=None, value_mode=None)
             if after and min(after) not in firsts:
                 firsts.append(min(after))
         cand, also = firsts[:1], firsts[1:]
+    if len(cand) > 1 and not block:
+        notes.append(f"{len(cand)} rows match {row!r} (rows {cand[:8]}); the first is used")
+        cand = cand[:1]
     if len(cand) != 1:
         shown = "; ".join(f"row {r}: {lab}" for r, lab in labels.items() if lab)[:900]
         why = (
@@ -1205,3 +1208,26 @@ def cell_lookup(ctx, source_id, sheet, row, column, block=None, value_mode=None)
         res.preview or ""
     )
     return res
+
+
+def _label_lookup(ctx, source_id, row, column):
+    """cell_lookup on a plain table: one label names a column, the other a value in some row."""
+    from municipal_qa.tools.registry import loose_name
+
+    tname = ctx.table_name(source_id, None)
+    df = ctx.frame(source_id, tname)
+    cols = {loose_name(c): c for c in df.columns}
+    for col_label, key in ((column, row), (row, column)):
+        c = cols.get(loose_name(str(val(col_label))))
+        if c is None:
+            continue
+        want = text(val(key))
+        for kc in df.columns:
+            hit = df[df[kc].map(text) == want]
+            if len(hit):
+                idx, r = next(iter(hit.iterrows()))
+                loc = row_loc(ctx, source_id, tname, idx, r, c, kc)
+                f = str_fact("value", r[c], f"{kc}={want} has {c} {text(r[c]) or 'blank'}", [loc])
+                return ok("cell_lookup", {}, [f], f"{kc}={want}: {c}={r[c]!r}")
+    raise OpError(f"{source_id} is a table, not a workbook; use lookup_row with key_column and "
+                  f"value; columns: {list(df.columns)[:30]}")  # fmt: skip

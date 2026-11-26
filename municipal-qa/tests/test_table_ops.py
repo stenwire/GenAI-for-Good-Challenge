@@ -315,7 +315,8 @@ def test_cell_lookup_by_labels_and_block(tmp_path, monkeypatch):
                   block="Helsinki"))["value"]  # fmt: skip
     assert h.locators[0].text == "sheet Results, cell B4" and "(Heat / 2023)" in h.claim
     amb = run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="Total", column="2024")
-    assert not amb.ok and "2 rows match" in amb.error and "row 6: Espoo" in amb.error
+    assert amb.ok and amb.facts[0].locators[0].text == "sheet Results, cell C5"
+    assert "2 rows match 'Total' (rows [5, 8]); the first is used" in amb.facts[0].note
     sw = facts(run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="2024", column="Total",
                    block="Espoo"))["value"]  # fmt: skip
     assert sw.locators[0].text == "sheet Results, cell C8" and "swapped" in sw.note
@@ -325,3 +326,9 @@ def test_cell_lookup_by_labels_and_block(tmp_path, monkeypatch):
     miss = run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="Heat", column="2030",
                block="Espoo")  # fmt: skip
     assert not miss.ok and "no column header '2030'" in miss.error
+
+
+def test_cell_lookup_on_a_table_uses_labels(ctx):
+    f = facts(run(ctx, "cell_lookup", source_id=A, sheet="x", row="T1", column="made_date"))
+    assert f["value"].value == "2018-04-20"
+    assert f["value"].locators[0].text == "reference=T1, column made_date"

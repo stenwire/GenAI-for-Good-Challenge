@@ -228,3 +228,15 @@ def test_dependent_step_of_a_failed_step_gets_no_repair(env):
     rec = answer_question(_q("What is the total?"), _deps(cfg, manifest, s))
     assert [k for k, _ in s.seen].count("repair") == 2  # both spent on step a, none on b
     assert "an earlier step it depends on failed" in rec.results[1].error
+
+
+def test_table_named_after_another_listed_file_moves_the_step(env):
+    cfg, manifest = env
+    from municipal_qa.profiling.profile import ProfileStore
+
+    ctx = ExecContext(ProfileStore(cfg, manifest), Conventions(raw_context=""), [GUIDE, TABLE])
+    where = [{"key_column": "year", "value": "2024"}]
+    args = {"source_id": GUIDE, "table": "revenue.csv", "where": where}
+    st = normalise(Step(op="count_rows", save_as="n", args=args), ctx)
+    assert st.args == {"source_id": TABLE, "where": [{"column": "year", "value": "2024"}]}
+    assert execute(Plan(steps=[st]), ctx).results[0].facts[0].value == 1
