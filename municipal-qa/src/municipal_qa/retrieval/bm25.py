@@ -20,13 +20,20 @@ _PKG = Path(__file__).resolve().parents[1]
 READER_LIBS = [
     "beautifulsoup4",
     "duckdb",
+    "geopandas",
+    "laspy",
+    "lazrs",
     "lxml",
     "openpyxl",
     "pandas",
     "pdfminer.six",
     "pdfplumber",
     "pillow",
+    "pyogrio",
+    "pyproj",
     "python-docx",
+    "rasterio",
+    "shapely",
 ]
 
 

@@ -111,8 +111,9 @@ def test_geojson_properties_only_with_warning(tmp_path):
     )
     prof = StructuredReader().profile(_src(p))
     assert "1 features" in prof.summary and "Polygon" in prof.summary
-    assert any("vector reader" in w for w in prof.warnings)
-    by = _by_loc(p)
+    assert any("properties only" in w for w in prof.warnings)
+    assert get_reader(_src(p)).name == "vector"
+    by = {x.locator.text: x for x in StructuredReader().passages(_src(p))}
     assert by["/features"].text == "zones.json: 1 features; properties: reference"
     assert by["/features/0/properties"].text == "reference: 1912/A1"
 

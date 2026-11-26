@@ -28,12 +28,12 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("MQA_DATA_DIR", str(tmp_path))
     (tmp_path / "SourceGuide.md").write_text("# Fields\n\n[z] means not applicable.\n")
     (tmp_path / "revenue.csv").write_text("year,london,metro\n2025,2478,[z]\n2024,2390,[z]\n")
-    (tmp_path / "surface.tif").write_bytes(b"II*\x00")
+    (tmp_path / "survey.dwg").write_bytes(b"II*\x00")
     (tmp_path / "broken.json").write_text("{not json")
     manifest = {
         f"SRC_{c * 12}": _info(f"SRC_{c * 12}", tmp_path / n)
         for c, n in zip(
-            "abcd", ["revenue.csv", "SourceGuide.md", "surface.tif", "broken.json"], strict=True
+            "abcd", ["revenue.csv", "SourceGuide.md", "survey.dwg", "broken.json"], strict=True
         )
     }
     cfg = load_config(env_file=tmp_path / "none.env").model_copy(
@@ -53,7 +53,7 @@ def test_profiles_values_kinds_and_fallbacks(env):
     guide = store.get("SRC_bbbbbbbbbbbb")
     assert guide.kind == "document" and guide.is_documentation
     tif = store.get("SRC_cccccccccccc")
-    assert (tif.kind, tif.reader, tif.warnings) == ("binary", "none", ["no reader for .tif yet"])
+    assert (tif.kind, tif.reader, tif.warnings) == ("binary", "none", ["no reader for .dwg yet"])
     bad = store.get("SRC_dddddddddddd")
     assert bad.kind == "binary" and bad.warnings[0].startswith("reader failed:")
 
@@ -140,6 +140,6 @@ def test_cli_profile_one_source(env, monkeypatch):
     monkeypatch.setattr("municipal_qa.data.manifest.load_manifest", lambda c: manifest)
     result = CliRunner().invoke(app, ["profile", "--source", "SRC_cccccccccccc", "--workers", "1"])
     assert result.exit_code == 0, result.output
-    assert "profiled 1 sources" in result.output and "no reader for .tif yet" in result.output
+    assert "profiled 1 sources" in result.output and "no reader for .dwg yet" in result.output
     bad = CliRunner().invoke(app, ["profile", "--source", "SRC_nope"])
     assert bad.exit_code == 1

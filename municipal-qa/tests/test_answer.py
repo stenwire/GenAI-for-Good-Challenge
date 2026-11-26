@@ -36,7 +36,7 @@ def env(tmp_path, monkeypatch):
     guide.write_text("# Shorthand\n\n[z] means not applicable, not zero.\n")
     table = tmp_path / "revenue.csv"
     table.write_text("year,london,metro\n2025,2478,[z]\n2024,2390,[z]\n")
-    raster = tmp_path / "surface.tif"
+    raster = tmp_path / "survey.dwg"
     raster.write_bytes(b"II*\x00")
     manifest = {
         "SRC_aaaaaaaaaaaa": _info("SRC_aaaaaaaaaaaa", guide),
@@ -153,7 +153,7 @@ def test_unreadable_source_gets_file_passage(env):
     cfg, manifest, q, _ = env
     deps = Deps(cfg, manifest, None)
     (p,) = deps.store.get("SRC_cccccccccccc")
-    assert p.locator.text == "file" and "no reader for .tif" in p.text
+    assert p.locator.text == "file" and "no reader for .dwg" in p.text
     with pytest.raises(UnsupportedFormat):
         from municipal_qa.readers.base import get_reader
 
