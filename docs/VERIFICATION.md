@@ -1,50 +1,38 @@
 # Verification Report
 
 **Milestone:** M1 - Baseline Submission
-**Scope:** M1 tasks T-101..T-116 and all 10 Definition-of-Done rows, with a code re-read of everything changed since the previous M1 audit (`adbb92c..32d777a`: `retrieval/bm25.py`, `pipeline/answer.py`, `pipeline/run.py`, `cli.py` run, `config.py`, `configs/default.yaml`, `evaluation/scorer.py`, `dev/build_devset.py`, `tests/test_answer.py`, `tests/test_run.py`); every checklist item M1 code touches; Dimension 1 (RUL-01..RUL-19) in full. Branch `m1-baseline-submission` at `32d777a`, with `SUBMISSIONS.md`, `docs/MILESTONES.md` and `docs/TODO.md` already modified (uncommitted T-115 record) when the run began.
-**Run audited:** `20261125-2323-f27f59e` (Test, 600 questions; the uploaded file, Zindi `69RjT4Yb`). Produced by `f27f59e`, before the T-110..T-114 changes; those were checked against the code, the test suite, the 3-question dev run `20261126-132606-adbb92c` and a replay of `clean_answer` over the stored answers.
+**Scope:** M1 tasks T-101..T-119 and all 10 Definition-of-Done rows, with a code re-read of everything changed since the second M1 audit (`32d777a..64cce8c`: `pipeline/answer.py`, `retrieval/bm25.py`, `tests/test_answer.py`, plus the tracker and `SUBMISSIONS.md` updates); every checklist item M1 code touches; Dimension 1 (RUL-01..RUL-19) in full. Branch `m1-baseline-submission` at `64cce8c`, clean apart from the long-standing untracked `.claude/` and `docs/CHALLENGE_BRIEF.md`.
+**Run audited:** `20261125-2323-f27f59e` (Test, 600 questions; the uploaded file, Zindi `69RjT4Yb`, public 0.215775462). Produced by `f27f59e`, before T-110..T-119; those changes were checked against the code, the suite, edge-case probes and the 2-question dev run `20261126-143730-32d777a`.
 **Date:** 2026-11-26
 **Blockers:** 0
 **Major:** 0
-**Minor:** 3
+**Minor:** 1
 **Verdict:** PASS
-**Dimensions not verified:** RUL-04 (no embedder or reranker yet), RUL-08 (no shared generative preprocessing exists), RUL-05's import-scan test (`evaluation/judge.py` not built; test is T-303); COR-04/05/09/10/11 and LAY-03 (calc, spatial, composer, verifier, op Facts not built in M1); REP-05..07 (no local encoders yet; README is M3/M4); SUB-07's `-k fallback` selector matches no test (covered instead by `tests/test_answer.py`, 14 passed). Checklist Gaps rows: Ollama pull in the rerun, rerun wall-clock limit, challenge data in public git history. The Zindi file-size Gap is partly answered by user evidence (Zindi scored the 795,356-byte file, public 0.215775462) but has no organiser figure; it stays a Gap until the checklist is updated.
+**Dimensions not verified:** RUL-04 (no embedder or reranker yet), RUL-08 (no shared generative preprocessing exists), RUL-05's import-scan test (`evaluation/judge.py` not built; test is T-303); COR-04/05/09/10/11 and LAY-03 (calc, spatial, composer, verifier, op Facts not built in M1); REP-05..07 (no local encoders yet; README is M3/M4). Checklist Gaps rows: Ollama pull in the rerun, rerun wall-clock limit, challenge data in public git history; Zindi file-size limit (user evidence: Zindi scored the 795,356-byte file; no organiser figure yet).
 
 ## Findings
 
 | # | Severity | Dimension | Location | Finding | Remediation |
 |---|---|---|---|---|---|
-| 1 | minor | 2. Submission | `municipal-qa/src/municipal_qa/pipeline/answer.py:41`, `:51`, `:65` | `_fold_bullets` treats any line starting `N.` or `N)` as a list item, so an answer that opens with its value loses it: `clean_answer("15. Fifteen routes changed.")` → `"Fifteen routes changed."`. Because lines are `rstrip`ped before folding, a bare marker line (`-`, `*`) is not matched and the next item is joined onto it: `"Total:\n- \n- x"` → `"Total:\n- x."`, leaving a line that starts `- `. Neither case occurs in the 662 stored M1 answers (0 numbered lines). | Fold numbered lines only when two or more consecutive lines are numbered; drop bare marker lines before folding; add both cases to `test_bullets_fold_into_sentences`. |
-| 2 | minor | 5. Tests | `municipal-qa/tests/test_answer.py:207-214` | `test_fingerprint_covers_every_reader_module` rewrites the tracked file `src/municipal_qa/readers/spreadsheet.py` and restores it in `finally`. An interrupted or parallel test run can leave the source modified or race another test that reads it. | Copy the readers directory to `tmp_path` and monkeypatch `bm25._PKG` (or the glob root) instead of editing the real source. |
-| 3 | minor | 4. Reproducibility | `municipal-qa/src/municipal_qa/retrieval/bm25.py:25` | `code_fingerprint` hashes `readers/*.py` and `bm25.py` only. Passages also depend on `schema.py` (`Passage` shape, revalidated from cache with defaults) and on reader library versions (`pdfplumber`, `openpyxl`, `lxml`, `beautifulsoup4`, `python-docx`, `duckdb` in `uv.lock`); a lock bump changes extracted text without invalidating the cache. | Add `schema.py` and the installed versions of the reader libraries (or the `uv.lock` hash) to the fingerprint. |
+| 1 | minor | 2. Submission | `municipal-qa/src/municipal_qa/pipeline/answer.py:50-51`, `:64` | Two narrower cases still drop a leading number when folding lists. A numbered first line followed by a bullet counts as a list item: `"15. Fifteen routes changed.\n- two of them in 2024"` → `"Fifteen routes changed. two of them in 2024."`. A bullet whose text starts with `N.` loses both markers, because `_NUMBERED.sub` runs after `_BULLET.sub`: `"- 5. stops closed"` → `"stops closed."`. None of the 662 stored M1 answers has a numbered line, so neither case has occurred. | Treat a numbered line as an item only when a neighbouring line is also numbered (not a bullet), and strip only the marker that matched; add both probes to `test_bullets_fold_into_sentences`. |
 
 ## Commands run
 
 ```
 $ git status --porcelain            # at start of run
- M SUBMISSIONS.md
- M docs/MILESTONES.md
- M docs/TODO.md
 ?? .claude/
 ?? docs/CHALLENGE_BRIEF.md
 $ git log --oneline -1
-32d777a T-110..T-114, T-116 (S5): fix verify M1 findings and add submission checkpoints
-$ ls municipal-qa/artifacts/runs/
-20261125-2322-f27f59e
-20261125-2323-f27f59e
-20261126-132606-adbb92c
-$ git diff --stat adbb92c..HEAD -- municipal-qa
- municipal-qa/configs/default.yaml                  |  2 +
- municipal-qa/dev/build_devset.py                   |  3 +-
- municipal-qa/src/municipal_qa/cli.py               |  5 +-
- municipal-qa/src/municipal_qa/config.py            |  2 +
- municipal-qa/src/municipal_qa/evaluation/scorer.py |  3 +-
- municipal-qa/src/municipal_qa/pipeline/answer.py   | 32 ++++++++--
- municipal-qa/src/municipal_qa/pipeline/run.py      |  4 +-
- municipal-qa/src/municipal_qa/retrieval/bm25.py    | 19 +++++-
- municipal-qa/tests/test_answer.py                  | 74 +++++++++++++++++++++-
- municipal-qa/tests/test_run.py                     | 18 ++++++
- 10 files changed, 150 insertions(+), 12 deletions(-)
+64cce8c T-117..T-119 (S5): harden list folding and the passage cache fingerprint
+$ git diff --stat 32d777a..HEAD
+ SUBMISSIONS.md                                   |   2 +-
+ docs/MILESTONES.md                               |   6 +-
+ docs/TODO.md                                     |  12 +-
+ docs/VERIFICATION.md                             | 166 +++++++++++++----------
+ municipal-qa/src/municipal_qa/pipeline/answer.py |  21 ++-
+ municipal-qa/src/municipal_qa/retrieval/bm25.py  |  30 +++-
+ municipal-qa/tests/test_answer.py                |  37 +++--
+ 7 files changed, 176 insertions(+), 98 deletions(-)
 ```
 
 RUL-01
@@ -56,7 +44,7 @@ quantization: Q4_K_M
 exit 0
 ```
 
-RUL-02, RUL-07: `llm/client.py` unchanged since the previous audit (not in the diff above).
+RUL-02, RUL-07: `llm/client.py` unchanged since the first M1 audit.
 
 RUL-03
 ```
@@ -64,9 +52,9 @@ municipal-qa/src/municipal_qa/llm/client.py:116:            data = self._post("/
 municipal-qa/src/municipal_qa/llm/client.py:128:            raise LLMError(f"{purpose}: malformed /api/chat reply: {e}") from e
 ```
 
-RUL-05: `rg -n "judge" pipeline llm cli.py` → exit 1; `evaluation/` holds `devset_check.py`, `report.py`, `scorer.py` only.
+RUL-05: exit 1 (`evaluation/` has no `judge.py`). RUL-11: exit 1. RUL-15: exit 1. RUL-18: exit 1.
 
-RUL-06: `pytest -o addopts="" -q tests/test_budget.py` → `11 passed in 0.01s`.
+RUL-06: `11 passed in 0.01s`.
 
 RUL-09 (all 600 rows of the audited run)
 ```
@@ -77,8 +65,6 @@ RUL-10 (src, configs, prompt template, tests, notebooks, dev)
 ```
 needles=1355 files=58 hits=0 prompt_files=1
 ```
-
-RUL-11: exit 1. RUL-15: exit 1. RUL-18: `git ls-files municipal-qa | rg ...` exit 1; `git ls-files | rg "^Data/"` exit 1.
 
 RUL-12
 ```
@@ -91,7 +77,7 @@ RUL-13
 municipal-qa/src/municipal_qa/llm/client.py:8:import httpx
 ```
 
-RUL-14: the only new file read is `code_fingerprint` reading the package's own `readers/*.py` and `bm25.py` (code, not sources); source paths still come only from `SourceInfo` built by `data/manifest.py`.
+RUL-14: new reads in `code_fingerprint` are package code (`readers/*.py`, `retrieval/bm25.py`, `schema.py`) and `importlib.metadata`; sources still resolve only through `data/manifest.py`.
 
 RUL-16
 ```
@@ -104,8 +90,8 @@ RUL-17 / RUL-19
 ```
  certifi                    2026.11.20  Mozilla Public License 2.0 (MPL 2.0)
  fqdn                       1.6.0       MPL-2.0
-(filtered, excluding certifi/fqdn):          <- empty = pass
-0                                            <- fqdn not in the runtime tree
+(filtered):          <- empty = pass
+0                    <- fqdn not in the runtime tree
 ```
 
 SUB-01, SUB-04, SUB-08
@@ -113,44 +99,36 @@ SUB-01, SUB-04, SUB-08
 1 warning(s), e.g. file is 795,356 bytes, above the unofficial 256 KiB guidance
 valid: 600 Test IDs in order, 795,356 bytes
 exit 0
-e41ef0d2d5097cec        # SHA256 prefix, matches SUBMISSIONS.md
-2205                    # ^- SRC_... evidence lines
-2337                    # lines starting "- " (file predates T-112)
+e41ef0d2d5097cec
+2205
+2337          # file predates T-112/T-117; replay of current clean_answer removes every list line (see T-117 Change log)
 ```
-
-T-112 replay of the current `clean_answer` over stored answers (counts only)
-```
-20261125-2322-f27f59e answers with list lines: before 3 after clean_answer 0 of 62
-20261125-2323-f27f59e answers with list lines: before 30 after clean_answer 0 of 600
-```
-
-Finding 1 evidence
-```
-20261125-2322-f27f59e answers whose FIRST line starts N./N): 0 any line: 0
-20261125-2323-f27f59e answers whose FIRST line starts N./N): 0 any line: 0
-'15. Fifteen routes changed.' -> 'Fifteen routes changed.'
-'7) seven' -> 'seven.'
-'* ' -> '*'
-'Total:\n- \n- x' -> 'Total:\n- x.'
-```
-
-Finding 2 evidence (`tests/test_answer.py`)
-```
-207:    target = bm25._PKG / "readers" / "spreadsheet.py"
-210:        target.write_bytes(original + b"\n")
-214:        target.write_bytes(original)
-```
-
-Finding 3 evidence: `bm25.py:25` `for f in sorted([*(_PKG / "readers").glob("*.py"), Path(__file__).resolve()]):`; readers import `municipal_qa.schema` (8 modules) and `municipal_qa.config` (1).
 
 SUB-02, SUB-07
 ```
-16 passed in 0.23s                 # tests/test_submission.py
-258 deselected in 0.47s            # -k fallback: selector matches nothing
-14 passed in 0.28s                 # tests/test_answer.py (six injected failures, never blank)
+16 passed in 0.24s       # tests/test_submission.py
+14 passed in 0.38s       # tests/test_answer.py (six injected failures, never blank)
 ```
 
-REP-01/02/03
+T-119 fingerprint inputs and Finding 1 probes
+```
+{'beautifulsoup4': '4.15.0', 'duckdb': '2.0.1', 'lxml': '6.1.3', 'openpyxl': '3.1.5', 'pandas': '3.1.1', 'pdfminer.six': '20260107', 'pdfplumber': '0.11.11', 'pillow': '13.0.0', 'python-docx': '1.2.0'}
+fingerprint 759acd4dc3e84b5f          # equals passage_cache_code in run 20261126-143730-32d777a
+'15. Fifteen routes changed.' -> '15. Fifteen routes changed.'
+'Total:\n- \n- x\n*' -> 'Total: x.'
+'Steps:\n1. Open\n2) Close' -> 'Steps: Open. Close.'
+'- 5. stops closed' -> 'stops closed.'
+'15. Fifteen routes changed.\n- two of them in 2024' -> 'Fifteen routes changed. two of them in 2024.'
+```
+
+Finding 1 location
+```
+50:    near = [lines[j] for j in (i - 1, i + 1) if 0 <= j < len(lines)]
+51:    return bool(_NUMBERED.match(lines[i])) and any(
+64:        item = _NUMBERED.sub("", _BULLET.sub("", ln), count=1).strip()
+```
+
+REP-01/02/03/04
 ```
 .python-version
 pyproject.toml
@@ -158,23 +136,22 @@ uv.lock
 8:  options: {temperature: 0, seed: 42, num_ctx: 8192}
 9:  think: false
 20261125-2323-f27f59e f27f59e False 42 0 8f68893c685c None complete
-20261126-132606-adbb92c adbb92c True 42 0 8f68893c685c 429363157b34a8e4 complete
+20261126-143730-32d777a 32d777a True 42 0 8f68893c685c 759acd4dc3e84b5f complete
+REP-04 exit 1
 ```
-(The audited run predates `passage_cache_code`; the smoke run records it. Its `dirty: True` is the uncommitted T-110..T-114 work at the time; it is not a submission run.)
 
-REP-04: exit 1.
-
-TST-01, TST-05
+TST-01, TST-05 (and source tree after the suite)
 ```
-258 passed in 13.49s
-23 passed, 235 deselected in 0.38s
+258 passed in 13.77s
+(git status --porcelain -- src tests: empty)
+23 passed, 235 deselected in 0.48s
 ```
 
 LAY-04, LAY-07, LAY-08
 ```
-src/municipal_qa/pipeline/evidence.py:19:    return f"{source_id} | {clean(locator) or 'file'} | {clean(claim) or 'source consulted'}"
+municipal-qa/src/municipal_qa/pipeline/evidence.py:19:    return f"{source_id} | {clean(locator) or 'file'} | {clean(claim) or 'source consulted'}"
 LAY-07 blocks > 5 lines: none
-attribution scans (repo, commits main..HEAD, PR #2 body): exit 1, exit 1, exit 1
+attribution scans (municipal-qa, commits main..HEAD, PR #2 body): exit 1, exit 1, exit 1
 ```
 
 BLD-01..04
@@ -191,23 +168,22 @@ All checks passed!
 
 ACC-01, ACC-02
 ```
-T-101[x] T-102[x] T-103[x] T-104[x] T-105[x] T-106[x] T-107[x] T-108[x] T-109[x] T-110[x] T-111[x] T-112[x] T-113[x] T-114[x] T-115[x] T-116[x]
+T-101[x] T-102[x] T-103[x] T-104[x] T-105[x] T-106[x] T-107[x] T-108[x] T-109[x] T-110[x] T-111[x] T-112[x] T-113[x] T-114[x] T-115[x] T-116[x] T-117[x] T-118[x] T-119[x]
 DoD1[x] DoD2[x] DoD3[x] DoD4[x] DoD5[x] DoD6[x] DoD7[x] DoD8[x] DoD9[x] DoD10[x]
-M1 status: in progress
+M1 status: awaiting verify
 open blockers: B-003 only (blocks T-404, M4)
-SUBMISSIONS.md leaderboard: 0.215775462 public (Zindi `69RjT4Yb`, uploaded 2026-11-26; rank 98, team Theus)
+PR #2: OPEN
 ```
-T-115's tick and the leaderboard entry are in the working tree, not yet committed. M1 reads `in progress` although every task is `[x]`; `/implement` moves it on.
 
 ## Dimension summary
 
 | Dimension | Result | Notes |
 |---|---|---|
 | 1. Competition-rule compliance | PASS | RUL-01, 03, 05 (scan), 06, 09 (600/600 rows: max 1 call, 600 tokens), 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 pass. RUL-04, 08 and the RUL-05 test not verified (not built). |
-| 2. Submission validity and evidence | PASS with minor | Audited file valid, 600 IDs in order, non-blank, 2,205 code-built evidence lines; the T-112 fix removes every list line from the stored answers on replay. Finding 1. |
-| 3. Correctness and conventions | PASS (M1 scope) | No reader, marker or SQLite code changed since the previous audit; calc, spatial and composer checks belong to M2/M3. |
-| 4. Reproducibility and licensing | PASS with minor | Previous major (cache key) fixed: key is source SHA256 + reader-code hash, recorded in the run manifest; run IDs have seconds and an existing run directory is refused. Finding 3. |
-| 5. Tests | PASS with minor | 258 passed; scorer 1.0 / 0.0 on Train. Finding 2. |
-| 6. Layering and DRY | PASS | Evidence lines formatted only in `pipeline/evidence.py`; `docs_first` and `evidence_from_top` now in `configs/default.yaml`. No comment block over 5 lines. |
+| 2. Submission validity and evidence | PASS with minor | Audited file valid, 600 IDs in order, non-blank, 2,205 code-built evidence lines. Second-pass finding 1 fixed for its probes; Finding 1 is a narrower residue. |
+| 3. Correctness and conventions | PASS (M1 scope) | No reader, marker or SQLite code changed; calc, spatial and composer checks belong to M2/M3. |
+| 4. Reproducibility and licensing | PASS | Second-pass finding 3 fixed: fingerprint covers reader code, `schema.py` and nine reader library versions, and the run manifest records it. |
+| 5. Tests | PASS | 258 passed; the suite no longer writes tracked files (second-pass finding 2 fixed). |
+| 6. Layering and DRY | PASS | Evidence lines formatted only in `pipeline/evidence.py`; no comment block over 5 lines. |
 | 7. Build and lint | PASS | BLD-01..04 pass. |
-| 8. Milestone acceptance | PASS | All 16 tasks and all 10 DoD rows `[x]` (T-115 uncommitted); leaderboard score recorded. |
+| 8. Milestone acceptance | PASS | All 19 tasks and all 10 DoD rows `[x]`; leaderboard score recorded. |

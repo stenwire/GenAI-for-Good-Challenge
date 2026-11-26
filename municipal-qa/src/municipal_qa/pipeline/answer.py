@@ -44,13 +44,11 @@ _BARE_MARKER = re.compile(r"^\s*(?:[-*•+]|\d{1,2}[.)])\s*$")
 
 
 def _is_item(lines: list[str], i: int) -> bool:
-    """Bullets always; `N.` only beside another list line, so a leading value survives."""
+    """Bullets always; `N.` only beside another `N.` line, so a leading value survives."""
     if _BULLET.match(lines[i]):
         return True
     near = [lines[j] for j in (i - 1, i + 1) if 0 <= j < len(lines)]
-    return bool(_NUMBERED.match(lines[i])) and any(
-        _NUMBERED.match(n) or _BULLET.match(n) for n in near
-    )
+    return bool(_NUMBERED.match(lines[i])) and any(_NUMBERED.match(n) for n in near)
 
 
 def _fold_bullets(lines: list[str]) -> list[str]:
@@ -61,7 +59,8 @@ def _fold_bullets(lines: list[str]) -> list[str]:
         if not _is_item(lines, i):
             out.append(ln)
             continue
-        item = _NUMBERED.sub("", _BULLET.sub("", ln), count=1).strip()
+        marker = _BULLET if _BULLET.match(ln) else _NUMBERED
+        item = marker.sub("", ln, count=1).strip()
         if item and item[-1] not in ".!?:;":
             item += "."
         if out and out[-1].strip():

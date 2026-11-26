@@ -227,7 +227,7 @@ def test_fingerprint_covers_readers_schema_and_libraries(tmp_path, monkeypatch):
 
 
 def test_bullets_fold_into_sentences():
-    text = "Two stops differ:\n- Stop A closed\n* Stop B moved.\n1. Stop C kept\n\nOther line."
+    text = "Two stops differ:\n- Stop A closed\n* Stop B moved.\n• Stop C kept\n\nOther line."
     out = clean_answer(text)
     assert out == "Two stops differ: Stop A closed. Stop B moved. Stop C kept.\n\nOther line."
     assert not re.search(r"^\s*(?:[-*•+]|\d{1,2}[.)])\s", out, re.M)
@@ -236,6 +236,11 @@ def test_bullets_fold_into_sentences():
     assert clean_answer("15. Fifteen routes changed.") == "15. Fifteen routes changed."
     assert clean_answer("Total:\n- \n- x\n*") == "Total: x."
     assert clean_answer("Steps:\n1. Open\n2) Close") == "Steps: Open. Close."
+    assert clean_answer("- 5. stops closed") == "5. stops closed."
+    assert (
+        clean_answer("15. Fifteen routes changed.\n- two of them in 2024")
+        == "15. Fifteen routes changed. two of them in 2024."
+    )
 
 
 def test_tunables_come_from_config(env, monkeypatch):
