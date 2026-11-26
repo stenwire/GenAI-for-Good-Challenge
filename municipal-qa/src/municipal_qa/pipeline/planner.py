@@ -18,7 +18,7 @@ TABLE_READ = [
 CALC = ["percent_change", "share", "pp_difference", "ratio", "calc", "compare_values"]
 OPS_BY_QTYPE = {
     "lookup": [*TABLE_READ, "get_range", "date_diff", "feature_lookup", "get_definition",
-               *CALC],
+               "ifc_footprint_area", *CALC],
     "count": ["count_rows", "count_distinct", "value_counts", "count_features", "filter_rows",
               "pointcloud_class_counts", "share", "cell_lookup"],
     "aggregate": ["aggregate", "group_aggregate", "top_n", "value_counts", "row_wise_max",
@@ -26,7 +26,7 @@ OPS_BY_QTYPE = {
     "compare": [*TABLE_READ, "aggregate", "group_aggregate", "row_wise_max", *CALC, "date_diff"],
     "spatial": ["layer_info", "area", "length", "distance", "within_radius", "point_in_polygon",
                 "intersects", "union_footprint", "count_features", "feature_lookup", "centroid",
-                "height_span", "geometry_validity", "convert_unit", *CALC],
+                "height_span", "geometry_validity", "convert_unit", "ifc_footprint_area", *CALC],
     "raster": ["raster_info", "raster_stats", "raster_pair_diff", "pointcloud_info",
                "pointcloud_class_counts", "pointcloud_z_stats", "area", *CALC],
     "data_quality": ["count_nulls", "duplicates", "set_compare", "join_check", "count_distinct",

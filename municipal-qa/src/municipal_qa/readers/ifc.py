@@ -285,3 +285,158 @@ class IfcReader:
 
 
 register(IfcReader())
+
+
+# ---------- geometry: placements, footprints, body extents ----------
+
+SI_PREFIX = {None: 1.0, "MILLI": 1e-3, "CENTI": 1e-2, "DECI": 1e-1, "KILO": 1e3}
+
+
+def length_scale(m: IfcModel) -> float:
+    """Metres per model length unit, from the project's unit assignment."""
+    for p in m.by_type("IFCPROJECT"):
+        ua = m.args(p)[8] if len(m.args(p)) > 8 else None
+        if not isinstance(ua, Ref):
+            continue
+        for u in m.args(ua)[0] or []:
+            if m.type_of(u) == "IFCSIUNIT" and m.args(u)[1] == "LENGTHUNIT":
+                return SI_PREFIX.get(m.args(u)[2], 1.0)
+    return 1.0
+
+
+def _xyz(m: IfcModel, ref) -> list[float]:
+    c = [float(v) for v in m.args(ref)[0]]
+    return c + [0.0] * (3 - len(c))
+
+
+def _axis_matrix(m: IfcModel, ref) -> list[list[float]]:
+    """4x4 matrix of an IfcAxis2Placement3D/2D: columns X, Y, Z axes and location."""
+    import numpy as np
+
+    a = m.args(ref)
+    loc = np.array(_xyz(m, a[0]))
+    if m.type_of(ref) == "IFCAXIS2PLACEMENT2D":
+        x = (
+            np.array(_xyz(m, a[1]))
+            if len(a) > 1 and isinstance(a[1], Ref)
+            else np.array([1.0, 0, 0])
+        )
+        z = np.array([0.0, 0, 1])
+    else:
+        z = np.array(_xyz(m, a[1])) if isinstance(a[1], Ref) else np.array([0.0, 0, 1])
+        x = np.array(_xyz(m, a[2])) if isinstance(a[2], Ref) else np.array([1.0, 0, 0])
+    z = z / np.linalg.norm(z)
+    x = x - np.dot(x, z) * z
+    x = x / np.linalg.norm(x)
+    y = np.cross(z, x)
+    out = np.eye(4)
+    out[:3, 0], out[:3, 1], out[:3, 2], out[:3, 3] = x, y, z, loc
+    return out
+
+
+def placement_matrix(m: IfcModel, ref):
+    """Model-world matrix of an IfcLocalPlacement chain (PlacementRelTo applied outermost)."""
+    import numpy as np
+
+    out = np.eye(4)
+    seen = set()
+    ref = Ref(ref) if isinstance(ref, int) and not isinstance(ref, bool) else ref
+    while isinstance(ref, Ref) and ref not in seen and m.type_of(ref) == "IFCLOCALPLACEMENT":
+        seen.add(ref)
+        rel, axis = m.args(ref)[0], m.args(ref)[1]
+        out = _axis_matrix(m, axis) @ out
+        ref = rel
+    return out
+
+
+def _apply(mat, pts):
+    import numpy as np
+
+    p = np.asarray(pts, dtype=float)
+    if p.shape[1] == 2:
+        p = np.c_[p, np.zeros(len(p))]
+    return (mat @ np.c_[p, np.ones(len(p))].T).T[:, :3]
+
+
+def _representations(m: IfcModel, i: int) -> dict[str, list]:
+    rep = m.args(i)[6] if len(m.args(i)) > 6 else None
+    out: dict[str, list] = {}
+    if not isinstance(rep, Ref):
+        return out
+    for s in m.args(rep)[2] or []:
+        a = m.args(s)
+        out.setdefault(str(a[1]), []).extend(a[3] or [])
+    return out
+
+
+def _polyline(m: IfcModel, ref) -> list[list[float]]:
+    return [_xyz(m, p) for p in m.args(ref)[0]]
+
+
+def _items_points(m: IfcModel, items) -> list[list[list[float]]]:
+    """Point lists (local coordinates) of faces, polylines or extruded profiles."""
+    import numpy as np
+
+    out = []
+    for it in items:
+        t = m.type_of(it)
+        if t == "IFCGEOMETRICCURVESET":
+            out += [_polyline(m, c) for c in m.args(it)[0] if m.type_of(c) == "IFCPOLYLINE"]
+        elif t == "IFCPOLYLINE":
+            out.append(_polyline(m, it))
+        elif t in ("IFCFACETEDBREP", "IFCFACETEDBREPWITHVOIDS"):
+            for face in m.args(m.args(it)[0])[0]:
+                for bound in m.args(face)[0]:
+                    loop = m.args(bound)[0]
+                    if m.type_of(loop) == "IFCPOLYLOOP":
+                        out.append([_xyz(m, p) for p in m.args(loop)[0]])
+        elif t == "IFCEXTRUDEDAREASOLID":
+            prof, pos, _, depth = m.args(it)[:4]
+            if m.type_of(prof) == "IFCARBITRARYCLOSEDPROFILEDEF":
+                base = _polyline(m, m.args(prof)[2])
+            elif m.type_of(prof) == "IFCRECTANGLEPROFILEDEF":
+                pa = m.args(prof)
+                hx, hy = float(pa[3]) / 2, float(pa[4]) / 2
+                base = _apply(_axis_matrix(m, pa[2]), [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]])
+                base = base.tolist()
+            else:
+                continue
+            mat = _axis_matrix(m, pos)
+            ring = _apply(mat, base)
+            top = ring + mat[:3, 2] * float(depth)
+            out += [ring.tolist(), np.asarray(top).tolist()]
+    return out
+
+
+def space_geometry(m: IfcModel, i: int) -> dict:
+    """Footprint area, model-world axis-aligned rectangle and Z range, in metres."""
+    import numpy as np
+    import shapely
+
+    k = length_scale(m)
+    world = placement_matrix(m, m.args(i)[5])
+    reps = _representations(m, i)
+    foot = _items_points(m, reps.get("FootPrint", []))
+    body = _items_points(m, reps.get("Body", []))
+    if foot:
+        local = shapely.union_all([shapely.Polygon([p[:2] for p in ring]) for ring in foot])
+        world_pts = np.vstack([_apply(world, ring) for ring in foot])
+        source = "FootPrint representation"
+    elif body:
+        rings = [_apply(world, r)[:, :2] for r in body]
+        local = shapely.union_all([shapely.Polygon(r).buffer(0) for r in rings if len(r) >= 3])
+        world_pts = np.vstack([_apply(world, r) for r in body])
+        source = "Body representation projected to plan"
+    else:
+        raise ValueError(f"#{i} has no FootPrint or Body geometry")
+    bz = np.vstack([_apply(world, r) for r in body]) if body else world_pts
+    w, d = np.ptp(world_pts[:, 0]), np.ptp(world_pts[:, 1])
+    return {
+        "footprint_m2": float(local.area) * k * k,
+        "bbox_m2": float(w * d) * k * k,
+        "bbox_w_m": float(w) * k,
+        "bbox_d_m": float(d) * k,
+        "z_min_m": float(bz[:, 2].min()) * k,
+        "z_max_m": float(bz[:, 2].max()) * k,
+        "source": source,
+    }
