@@ -141,8 +141,8 @@ with JSON-schema-constrained output and repair.
 | 4 | Train `06ffb5b9` yields 3.48 ha; 100 m square → 1.00000 ha; half-up vs half-even on 2.345; inclusive radius; DSM−DTM with nodata (card S4) | [ ] |
 | 5 | Retrieval recall@8 > 0.8 on dev semantics questions; search < 300 ms per query on CPU (card T2) | [x] |
 | 6 | Dev set ≥ 90 rows; `devset_check.py` passes (card T3) | [x] |
-| 7 | ≥ 80% of dev plans execute without error after at most 2 repairs (card S3) | [ ] |
-| 8 | `uv run mqa evaluate` on a full dev run, score table pasted, per domain and per qtype | [ ] |
+| 7 | ≥ 80% of dev plans execute without error after at most 2 repairs (card S3) | [x] |
+| 8 | `uv run mqa evaluate` on a full dev run, score table pasted, per domain and per qtype | [x] |
 
 ### Verification
 
