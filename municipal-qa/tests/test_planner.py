@@ -141,7 +141,7 @@ def test_semantics_with_docs_skips_planning(env):
 def test_router_failure_falls_back_to_rules_and_bad_plan_to_passages(env):
     cfg, manifest = env
     s = Script(route=None, plan="not json", compose="The sources show 2478 for 2025.")
-    rec = answer_question(_q("How many records are in revenue.csv?"), _deps(cfg, manifest, s))
+    rec = answer_question(_q("How many rows show London revenue?"), _deps(cfg, manifest, s))
     assert rec.route.qtype == QuestionType.COUNT  # keyword rule
     assert "route: LLMError" in rec.error and "plan: JSONDecodeError" in rec.error
     assert rec.answer == "The sources show 2478 for 2025." and rec.evidence

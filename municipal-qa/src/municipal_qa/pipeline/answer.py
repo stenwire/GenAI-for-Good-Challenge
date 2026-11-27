@@ -212,7 +212,7 @@ def _compose_planned(q, route, conv, pairs, passages, deps, budget) -> str:
 
 
 def _answer_planned(q: Question, deps: Deps) -> AnswerRecord:
-    from municipal_qa.pipeline import executor, planner, router
+    from municipal_qa.pipeline import executor, planner, router, templates
     from municipal_qa.profiling.profile import render_profiles
     from municipal_qa.tools.registry import ExecContext
 
@@ -243,13 +243,28 @@ def _answer_planned(q: Question, deps: Deps) -> AnswerRecord:
     docs_suffice = qtype in TEXT_QTYPES and any(p.kind != "body" for p in passages)
     plan, ex = None, None
     ctx = ExecContext(deps.profiles, conv, list(q.source_ids), retriever=deps.retriever)
-    if deps.client is not None and not docs_suffice:
+    tex = None
+    if not docs_suffice:
+        try:
+            tplan = templates.template_plan(q.question, profiles, ctx, qtype)
+        except Exception as e:  # noqa: BLE001
+            tplan = None
+            errors.append(f"template: {type(e).__name__}: {e}")
+        if tplan is not None:
+            tex = executor.execute(tplan, ctx, None, 0)
+            if not tex.ok:
+                bad = [f"{s.op}: {r.error}" for s, r in zip(tex.steps, tex.results, strict=True)
+                       if not r.ok]  # fmt: skip
+                errors.append(f"template failed, model planner used: {'; '.join(bad)[:300]}")
+    if tex is not None and tex.ok:
+        plan, ex = Plan(steps=tex.steps, rationale=tplan.rationale), tex
+    elif deps.client is not None and not docs_suffice:
         profiles_text = render_profiles(profiles, 6000, q.question)
         try:
             plan = planner.plan(q, route, conv, profiles_text, deps.client, budget, profiles)
         except Exception as e:  # noqa: BLE001
             errors.append(f"plan: {type(e).__name__}: {e}")
-    if plan is not None:
+    if plan is not None and ex is None:
         base = planner.ops_for(qtype, q.question)
         ops = planner.usable_ops(base, profiles) or base
 
