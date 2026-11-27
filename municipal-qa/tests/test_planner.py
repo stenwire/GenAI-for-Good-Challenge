@@ -240,3 +240,31 @@ def test_table_named_after_another_listed_file_moves_the_step(env):
     st = normalise(Step(op="count_rows", save_as="n", args=args), ctx)
     assert st.args == {"source_id": TABLE, "where": [{"column": "year", "value": "2024"}]}
     assert execute(Plan(steps=[st]), ctx).results[0].facts[0].value == 1
+
+
+def test_constrained_schema_limits_names_and_ops(env):
+    cfg, manifest = env
+    from municipal_qa.profiling.profile import ProfileStore
+
+    profiles = ProfileStore(cfg, manifest).get_many([GUIDE, TABLE])
+    args = planner.constrained_args("aggregate", profiles)
+    assert args["properties"]["source_id"]["enum"] == [TABLE]  # the guide has no tables
+    assert args["properties"]["column"]["enum"] == ["year", "london", "metro"]
+    where_col = args["properties"]["where"]["items"]["properties"]["column"]
+    assert where_col["enum"] == ["year", "london", "metro"]
+    assert planner.constrained_args("raster_stats", profiles) is None
+    ops = planner.usable_ops(["aggregate", "raster_stats", "area", "share"], profiles)
+    assert ops == ["aggregate", "share"]
+    alts = planner.constrained_step(ops, profiles)["anyOf"]
+    assert [a["properties"]["op"]["enum"] for a in alts] == [["aggregate"], ["share"]]
+    assert "get_cell" not in planner.ops_for("lookup", "What was revenue in 2025?")
+    assert planner.ops_for("lookup", "What is in cell H23?")[0] == "get_cell"
+
+
+def test_parse_plan_makes_step_names_identifiers():
+    a = {"op": "count_rows", "args": {"source_id": TABLE}, "save_as": "tpo-groups info"}
+    b = {"op": "calc", "args": {"expression": "$tpo-groups info * 2"}, "save_as": "2x"}
+    text = json.dumps({"steps": [a, b]})
+    p = planner.parse_plan(text)
+    assert [s.save_as for s in p.steps] == ["tpo_groups_info", "s2_2x"]
+    assert p.steps[1].args["expression"] == "$tpo_groups_info * 2"

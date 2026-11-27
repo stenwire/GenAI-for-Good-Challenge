@@ -290,7 +290,7 @@ def test_cell_lookup_by_labels_and_block(tmp_path, monkeypatch):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Results"
-    rows = [["Energy (GWh)"], ["Area", 2023, 2024], ["Helsinki"], ["Heat", 10.25, 11.5],
+    rows = [["Energy (GWh)"], ["Area", 2023, 2024], ["Helsinki", 2023, 2024], ["Heat", 10.25, 11.5],
             ["Total", 20, 21], ["Espoo"], ["Heat", 30, 31], ["Total", 40, 41.256],
             ["Grand total", 60, 62]]  # fmt: skip
     for r in rows:
@@ -323,6 +323,8 @@ def test_cell_lookup_by_labels_and_block(tmp_path, monkeypatch):
     nb = facts(run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="Grand total",
                    column="2024", block="Vantaa"))["value"]  # fmt: skip
     assert "block 'Vantaa' not found" in nb.note and nb.locators[0].text == "sheet Results, cell C9"
+    head = run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="Helsinki", column="2024")
+    assert not head.ok and "is a heading" in head.error
     miss = run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="Heat", column="2030",
                block="Espoo")  # fmt: skip
     assert not miss.ok and "no column header '2030'" in miss.error

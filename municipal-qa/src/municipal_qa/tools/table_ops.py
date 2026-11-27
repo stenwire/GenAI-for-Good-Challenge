@@ -1110,6 +1110,15 @@ def sql(ctx: ExecContext, query):
     return ok("sql", {}, facts, out.head(20).to_string())
 
 
+def _is_heading(row_cells: list) -> bool:
+    """A row whose cells after the label are all text or years is a header, not data."""
+    filled = sorted((c for c in row_cells if c.stored not in (None, "")), key=lambda c: c.col)
+    rest = filled[1:]
+    year = re.compile(r"^(1[89]|20)\d\d$")
+    return len(rest) >= 2 and all(isinstance(c.stored, str) or year.match(str(c.stored))
+                                  for c in rest)  # fmt: skip
+
+
 def _label(cells_by_row: dict[int, list], r: int) -> str:
     for c in cells_by_row.get(r, []):
         if c.col <= 2 and c.displayed not in (None, ""):
@@ -1195,6 +1204,10 @@ def cell_lookup(ctx, source_id, sheet, row, column, block=None, value_mode=None)
     head = max((c for c in heads if _match(str(val(column)), str(c.displayed)) == top),
                key=lambda c: c.row)  # fmt: skip
     ref = f"{col_letter(head.col)}{r}"
+    if head.row == r or _is_heading(by_row.get(r, [])):
+        below = [lab for rr, lab in labels.items() if r < rr <= r + 15 and lab][:15]
+        raise OpError(f"cell_lookup: row {r} ({labels[r]!r}) is a heading, not data; use block="
+                      f"{labels[r]!r} with one of these rows: {below}")  # fmt: skip
     res = op_get_cell(ctx, source_id, sheet, ref, value_mode)
     f = res.facts[0]
     if also:

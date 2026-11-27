@@ -197,6 +197,8 @@ _TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool
 
 def _coerce(name: str, v: Any, spec: dict) -> Any:
     t = spec.get("type")
+    if isinstance(v, Fact) and t == "string":
+        return str(v.value if v.value is not None else v.display)
     if isinstance(v, Fact) or t is None:
         return v
     if t == "array" and not isinstance(v, list):

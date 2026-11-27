@@ -246,18 +246,19 @@ def _answer_planned(q: Question, deps: Deps) -> AnswerRecord:
     if deps.client is not None and not docs_suffice:
         profiles_text = render_profiles(profiles, 6000, q.question)
         try:
-            plan = planner.plan(q, route, conv, profiles_text, deps.client, budget)
+            plan = planner.plan(q, route, conv, profiles_text, deps.client, budget, profiles)
         except Exception as e:  # noqa: BLE001
             errors.append(f"plan: {type(e).__name__}: {e}")
     if plan is not None:
-        ops = planner.ops_for(qtype)
+        base = planner.ops_for(qtype, q.question)
+        ops = planner.usable_ops(base, profiles) or base
 
         def repair(step, error):
             sid = next((step.args.get(k) for k in executor.SOURCE_KEYS if step.args.get(k)), None)
             one = [p for p in profiles if p.source.source_id == sid] or profiles
             text = render_profiles(one, 2500, q.question)
             saved = sorted(ctx.env)
-            return planner.repair(q, step, error, saved, text, deps.client, budget, ops)
+            return planner.repair(q, step, error, saved, text, deps.client, budget, ops, profiles)
 
         ex = executor.execute(plan, ctx, repair, cfg.pipeline.max_repairs)
         done = zip(ex.steps, ex.results, strict=True)
