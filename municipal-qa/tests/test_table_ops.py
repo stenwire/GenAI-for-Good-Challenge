@@ -324,7 +324,8 @@ def test_cell_lookup_by_labels_and_block(tmp_path, monkeypatch):
                    column="2024", block="Vantaa"))["value"]  # fmt: skip
     assert "block 'Vantaa' not found" in nb.note and nb.locators[0].text == "sheet Results, cell C9"
     head = run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="Helsinki", column="2024")
-    assert not head.ok and "is a heading" in head.error
+    assert head.ok and head.facts[0].locators[0].text == "sheet Results, cell C5"
+    assert "'Helsinki' is a block heading; its total row 'Total' is used" in head.facts[0].note
     miss = run(ctx, "cell_lookup", source_id=sid, sheet="Results", row="Heat", column="2030",
                block="Espoo")  # fmt: skip
     assert not miss.ok and "no column header '2030'" in miss.error

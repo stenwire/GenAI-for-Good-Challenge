@@ -126,7 +126,10 @@ def constrained_args(op: str, profiles) -> dict | None:
             item = dict(props[k]["items"])
             item["properties"] = {**item["properties"], "column": _enum(cols)}
             props[k] = {"type": "array", "items": item}
-    return {"type": "object", "properties": props, "required": spec.args_schema["required"]}
+    req = list(spec.args_schema["required"])
+    if "table" in props and "table" not in req and any(len(p.tables) > 1 for p in mine):
+        req.append("table")  # several tables: the step must name one
+    return {"type": "object", "properties": props, "required": req}
 
 
 _YEAR = re.compile(r"^(1[89]|20)\d\d$")

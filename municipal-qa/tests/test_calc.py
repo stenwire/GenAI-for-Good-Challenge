@@ -52,6 +52,7 @@ def test_calc_keeps_full_precision_and_rounds_once():
     assert [x.text for x in f.locators] == ["sheet T, cell A1", "sheet T, cell B1"]
     env = {**_saved("p", 0.125, "0.125"), **_saved("q", 0.125, "0.125")}
     assert run(_ctx(), "calc", env, expression="$p + $q")["value"].display == "0.25"
+    assert run(_ctx(), "calc", expression="1,821 + 1")["value"].value == 1822
     g = run(_ctx(), "calc", expression="(0.125 + 0.125) * -(2)")["value"]
     assert g.value == -0.5
     for bad, msg in [

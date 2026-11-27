@@ -97,7 +97,7 @@ _TOK = re.compile(r"\s*(\$[A-Za-z_][\w.]*|\d+\.?\d*(?:[eE][-+]?\d+)?|\.\d+|[-+*/
 def evaluate(expr: str, ctx: ExecContext) -> tuple[Decimal, list[Fact]]:
     """`+ - * / ( )` over numbers and `$step` / `$step.fact` references, in Decimal."""
     toks, pos, used = [], 0, []
-    expr = expr.strip()
+    expr = re.sub(r"(?<=\d),(?=\d{3}\b)", "", expr.strip())
     while pos < len(expr):
         m = _TOK.match(expr, pos)
         if not m:

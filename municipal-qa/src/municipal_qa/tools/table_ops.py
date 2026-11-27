@@ -135,6 +135,8 @@ def apply_where(df: pd.DataFrame, where: list | None) -> pd.DataFrame:
         if op_ not in WHERE_OPS:
             raise OpError(f"where op {op_!r} not in {WHERE_OPS}")
         col, target = df[w["column"]], w.get("value")
+        if isinstance(col, pd.DataFrame):  # duplicated column label: the first one is meant
+            col = col.iloc[:, 0]
         mask &= col.map(lambda x, o=op_, v=target: _cmp(x, o, v)).astype(bool)
     return df[mask]
 
@@ -1110,6 +1112,9 @@ def sql(ctx: ExecContext, query):
     return ok("sql", {}, facts, out.head(20).to_string())
 
 
+TOTAL = re.compile(r"\b(total|totals|yhteensä|summa|insgesamt|gesamt|totaal|totale|all)\b", re.I)
+
+
 def _is_heading(row_cells: list) -> bool:
     """A row whose cells after the label are all text or years is a header, not data."""
     filled = sorted((c for c in row_cells if c.stored not in (None, "")), key=lambda c: c.col)
@@ -1204,6 +1209,15 @@ def cell_lookup(ctx, source_id, sheet, row, column, block=None, value_mode=None)
     head = max((c for c in heads if _match(str(val(column)), str(c.displayed)) == top),
                key=lambda c: c.row)  # fmt: skip
     ref = f"{col_letter(head.col)}{r}"
+    if head.row == r or _is_heading(by_row.get(r, [])):
+        nxt = sorted(rr for rr in labels if rr > r and _is_heading(by_row.get(rr, [])))
+        end = nxt[0] if nxt else r + 30
+        totals = [rr for rr in labels if r < rr < end and TOTAL.search(labels[rr])]
+        if totals:
+            notes.append(f"{labels[r]!r} is a block heading; its total row {labels[totals[0]]!r} "
+                         f"is used")  # fmt: skip
+            r = totals[0]
+            ref = f"{col_letter(head.col)}{r}"
     if head.row == r or _is_heading(by_row.get(r, [])):
         below = [lab for rr, lab in labels.items() if r < rr <= r + 15 and lab][:15]
         raise OpError(f"cell_lookup: row {r} ({labels[r]!r}) is a heading, not data; use block="
