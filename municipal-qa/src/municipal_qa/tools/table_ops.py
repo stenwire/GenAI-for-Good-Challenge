@@ -1199,7 +1199,9 @@ def cell_lookup(ctx, source_id, sheet, row, column, block=None, value_mode=None)
         )
         raise OpError(f"cell_lookup: {why} {row!r} in sheet {sheet}. Row labels: {shown}")
     r = cand[0]
-    heads = [c for c in cells if c.row < r and _match(str(val(column)), str(c.displayed or ""))]
+    first = min((c.col for c in by_row.get(r, []) if c.displayed not in (None, "")), default=1)
+    heads = [c for c in cells if c.row < r and c.col > first
+             and _match(str(val(column)), str(c.displayed or ""))]  # fmt: skip
     if not heads:
         hdr = sorted({str(c.displayed) for c in cells if c.row < r and isinstance(c.stored, str)})[
             :40
