@@ -603,12 +603,12 @@ add(
 
 add(
     "buildings_energy",
-    "insufficient",
-    "What was Helsinki's energy consumption per resident in 2024?",
-    "The workbook cannot answer this: it gives consumption in GWh by city and sector but no "
-    "population figures, so per-resident use cannot be calculated from it.",
-    [hev(22, 2024, "Helsinki total in GWh only")],
-    [{"type": "text", "text": "no population figures", "keywords": ["population"]}],
+    "lookup",
+    "What was Helsinki's total energy consumption per resident in 2024?",
+    f"Helsinki used {f2(stored(HSY, 'Tulokset', 'BE22'))} kWh per resident in 2024, from the "
+    f"workbook's per-resident (Asukasta kohti) block.",
+    [cell_ev(HSY, "Tulokset", "BE22", "per-resident total 2024 in kWh")],
+    [num(q2(stored(HSY, "Tulokset", "BE22")), "kWh")],
 )
 
 add(
@@ -745,7 +745,7 @@ add(
     f"of {len(gtrees) - len(trees)}, but the formats are separate publications that must not be "
     f"assumed to be row-for-row copies.",
     [
-        (TREES_GEOJSON, "/features", f"{len(gtrees):,} features"),
+        (TREES_GEOJSON, "layer trees-2026-06-23.geojson", f"{len(gtrees):,} features"),
         (TREES_CSV, "header row", f"{len(trees):,} rows"),
         (GUIDE_G, guide_loc(GUIDE_G, "Similar filenames"), "formats are not row-for-row copies"),
     ],
@@ -763,7 +763,7 @@ add(
     f"{gtrees.crs.to_string()} (WGS 84).",
     [
         (GPKG, "layer ezytreevcurrenttpotrees", "CRS EPSG:27700"),
-        (TREES_GEOJSON, "/features", "CRS EPSG:4326"),
+        (TREES_GEOJSON, "layer trees-2026-06-23.geojson", "CRS EPSG:4326"),
     ],
     [
         {"type": "text", "text": "EPSG:27700", "keywords": ["27700"]},
@@ -778,7 +778,10 @@ add(
     "How many zone polygons in zones-2026-06-23.geojson are invalid geometries?",
     f"{len(invalid)} of the {len(zones)} zone polygons are invalid; they should be measured as "
     f"published, not repaired.",
-    [(ZONES, f"properties.reference={r}", "invalid geometry") for r in invalid["reference"]],
+    [
+        (ZONES, f"layer zones-2026-06-23.geojson, feature reference={r}", "invalid geometry")
+        for r in invalid["reference"]
+    ],
     [num(Decimal(len(invalid)), None, 0)],
 )
 
@@ -791,7 +794,7 @@ for ref in [valid["reference"].iloc[0], valid["reference"].iloc[9]]:
         "spatial",
         f"What is the area of zone {ref} in hectares, measured in British National Grid metres?",
         f"Zone {ref} covers {f2(ha)} hectares in British National Grid (EPSG:27700).",
-        [(ZONES, f"properties.reference={ref}", f"area {f2(ha)} ha")],
+        [(ZONES, f"layer zones-2026-06-23.geojson, feature reference={ref}", f"area {f2(ha)} ha")],
         [num(q2(ha), "ha")],
     )
 
@@ -802,7 +805,7 @@ add(
     "tpo-groups.csv?",
     f"The GeoJSON has {len(zones)} zones and tpo-groups.csv has {len(groups)} records.",
     [
-        (ZONES, "/features", f"{len(zones)} features"),
+        (ZONES, "layer zones-2026-06-23.geojson", f"{len(zones)} features"),
         (GROUPS_CSV, "header row", f"{len(groups)} rows"),
     ],
     [num(Decimal(len(zones)), None, 0), num(Decimal(len(groups)), None, 0)],
@@ -960,8 +963,343 @@ add(
     "data_quality",
     "How many tree features in trees-2026-06-23.geojson have a felled-date?",
     f"{felled} of the {len(gtrees):,} tree features have a felled-date.",
-    [(TREES_GEOJSON, "/features", f"{felled} with felled-date")],
+    [(TREES_GEOJSON, "layer trees-2026-06-23.geojson", f"{felled} with felled-date")],
     [num(Decimal(felled), None, 0)],
+)
+
+# ---------------------------------------------------------------- T-208 additions (30)
+
+
+def note_loc(sid: str, phrase: str) -> str:
+    return guide_loc(sid, phrase)
+
+
+def yes_no(v: str) -> dict:
+    return {"type": "yes_no", "value": v, "text": v.capitalize()}
+
+
+def kw(text: str, *words: str) -> dict:
+    return {"type": "text", "text": text, "keywords": list(words)}
+
+
+add(
+    "transport",
+    "semantics",
+    "Some BUS01a figures are marked [p]. What does [p] mean in that table?",
+    "[p] means provisional: the table's shorthand line defines [p] = provisional, so those "
+    "figures may still be revised.",
+    [(BUS01, note_loc(BUS01, "[p] = provisional"), "[p] = provisional")],
+    [kw("provisional", "provisional")],
+)
+add(
+    "transport",
+    "semantics",
+    "Do the bus journeys per head of population in BUS01b only count journeys made by residents?",
+    "No. The journey figures include journeys by non-residents, while the population figures "
+    "are for residents only, as at June.",
+    [(BUS01, note_loc(BUS01, "include by non-residents"), "journeys include non-residents")],
+    [yes_no("no"), kw("journeys include non-residents", "non-residents")],
+)
+add(
+    "transport",
+    "semantics",
+    "Are the Isles of Scilly included in the bus01.ods passenger journey tables?",
+    "No. The notes state that the Isles of Scilly are not included.",
+    [(BUS01, note_loc(BUS01, "Isles of Scilly"), "Isles of Scilly not included")],
+    [yes_no("no")],
+)
+add(
+    "transport",
+    "semantics",
+    "How is average bus occupancy calculated in the BUS03b table?",
+    "Average bus occupancy is passenger miles (table BUS03a_mi) divided by vehicle miles "
+    "(table BUS02a_mi).",
+    [(BUS03, note_loc(BUS03, "Average bus occupancy is calculated"), "passenger / vehicle miles")],
+    [kw("passenger miles divided by vehicle miles", "passenger miles", "vehicle miles")],
+)
+add(
+    "transport",
+    "semantics",
+    "In the BUS06 vehicle tables, what separates a bus from a minibus?",
+    "A bus is licensed for over 22 passengers including standing; a minibus carries 8 to 22 "
+    "passengers including standing.",
+    [
+        (BUS06, note_loc(BUS06, "Buses are licenced for over 22"), "bus: over 22 passengers"),
+        (BUS06, note_loc(BUS06, "Minibuses have 8 to 22"), "minibus: 8 to 22 passengers"),
+    ],
+    [kw("over 22 passengers", "22"), kw("8 to 22", "8")],
+)
+add(
+    "transport",
+    "semantics",
+    "bus01.ods was revised in March 2026. Do the revisions show a change in passenger behaviour?",
+    "No. The revisions came from updates to the underlying data and a processing enhancement; "
+    "they do not reflect changes in passenger or operator behaviour.",
+    [(BUS01, note_loc(BUS01, "In March 2026, these statistics were revised"), "data update")],
+    [yes_no("no"), kw("updates to the underlying data", "underlying data")],
+)
+add(
+    "transport",
+    "count",
+    "According to its cover sheet, how many data tables does bus01.ods contain?",
+    "The cover sheet says bus01.ods contains 8 (eight) data tables.",
+    [(BUS01, note_loc(BUS01, "contains eight data tables"), "eight data tables")],
+    [num(Decimal(8), None, 0)],
+)
+s_t29, d_t29 = stored(BUS01, "BUS01a", "T29"), disp(BUS01, "BUS01a", "T29")
+add(
+    "transport",
+    "stored_displayed",
+    "BUS01a shows England outside London's journeys for the year ending March 2025 as a whole "
+    "number. Which value should this briefing use, and what is stored in the cell?",
+    f"Use the displayed {d_t29:,} million, as the Context requires; the cell stores "
+    f"{s_t29} million.",
+    [cell_ev(BUS01, "BUS01a", "T29", f"displayed {d_t29:,}, stored {s_t29}")],
+    [num(d_t29, None, 0)],
+)
+add(
+    "transport",
+    "insufficient",
+    "How many bus passenger journeys were made in England in calendar year 2024, January to "
+    "December?",
+    "The workbooks cannot give a calendar-year figure: BUS01a reports years ending March, so "
+    "January to December 2024 is not published.",
+    [cell_ev(BUS01, "BUS01a", "A29", "years ending March")],
+    [kw("years ending March", "march")],
+)
+l24, l25 = disp(BUS01, "BUS01a", "H28"), disp(BUS01, "BUS01a", "H29")
+add(
+    "transport",
+    "compare",
+    "By what percentage did London's bus passenger journeys change from the year ending March "
+    "2024 to the year ending March 2025?",
+    f"London's journeys fell by {f2(abs((l25 - l24) / l24 * 100))}%, from {l24:,} million to "
+    f"{l25:,} million.",
+    [
+        cell_ev(BUS01, "BUS01a", "H28", f"{l24:,} million, YE March 2024"),
+        cell_ev(BUS01, "BUS01a", "H29", f"{l25:,} million, YE March 2025"),
+    ],
+    [num(q2(abs((l25 - l24) / l24 * 100)), "%")],
+)
+
+# energy
+add(
+    "buildings_energy",
+    "semantics",
+    "The HSY guide gives 2026-11-03 as the source date. Were these energy figures measured in "
+    "2026?",
+    "No. 2026-11-03 is the frozen acquisition date, when the copy was obtained, not the year "
+    "measured; the workbook covers 1990 and 2000 to 2024.",
+    [(GUIDE_E, guide_loc(GUIDE_E, "frozen acquisition"), "acquisition date, not year measured")],
+    [yes_no("no"), kw("acquisition date", "acquisition", "obtained")],
+)
+add(
+    "buildings_energy",
+    "semantics",
+    "Can I report the rounded GWh shown in the HSY cells instead of the stored values when the "
+    "question asks for stored precision?",
+    "No. Displayed rounding hides stored decimals; follow the stated convention and do not "
+    "replace stored values with the rounded display text.",
+    [(GUIDE_E, guide_loc(GUIDE_E, "do not silently replace"), "do not replace stored values")],
+    [yes_no("no"), kw("do not replace stored values", "stored")],
+)
+add(
+    "buildings_energy",
+    "semantics",
+    "Does the HSY workbook have figures for 1995?",
+    "No. It covers 1990 and then 2000 to 2024; the years 1991 to 1999 are not included.",
+    [(GUIDE_E, guide_loc(GUIDE_E, "covers 1990 and 2000-2024"), "1990 and 2000-2024")],
+    [yes_no("no")],
+)
+pr_e, pr_v = stored(HSY, "Tulokset", "BE35"), stored(HSY, "Tulokset", "BE48")
+hi, lo = ("Vantaa", "Espoo") if pr_v > pr_e else ("Espoo", "Vantaa")
+add(
+    "buildings_energy",
+    "compare",
+    "Per resident, which city used more energy in 2024, Espoo or Vantaa, and by how many kWh?",
+    f"{hi} used more: {f2(max(pr_e, pr_v))} kWh per resident against {f2(min(pr_e, pr_v))} kWh "
+    f"for {lo}, a difference of {f2(abs(pr_v - pr_e))} kWh.",
+    [
+        cell_ev(HSY, "Tulokset", "BE35", "Espoo per-resident total 2024"),
+        cell_ev(HSY, "Tulokset", "BE48", "Vantaa per-resident total 2024"),
+    ],
+    [kw(hi, hi), num(q2(abs(pr_v - pr_e)), "kWh")],
+)
+srv, tot = hsy(38, 2024), hsy(40, 2024)
+add(
+    "buildings_energy",
+    "aggregate",
+    "What share of Espoo's 2024 sector total was the services sector (Palvelut)?",
+    f"Services were {f2(srv / tot * 100)}% of Espoo's 2024 sector total "
+    f"({f2(srv)} of {f2(tot)} GWh).",
+    [hev(38, 2024, "Espoo services 2024"), hev(40, 2024, "Espoo sector total 2024")],
+    [num(q2(srv / tot * 100), "%")],
+)
+k23, k24 = hsy(55, 2023), hsy(55, 2024)
+add(
+    "buildings_energy",
+    "compare",
+    "By what percentage did Kauniainen's district heating (Kaukolämpö) change from 2023 to 2024?",
+    f"Kauniainen's district heating {'rose' if k24 > k23 else 'fell'} by "
+    f"{f2(abs((k24 - k23) / k23 * 100))}%, from {f2(k23)} to {f2(k24)} GWh.",
+    [hev(55, 2023, "Kauniainen district heating 2023"), hev(55, 2024, "2024")],
+    [num(q2(abs((k24 - k23) / k23 * 100)), "%")],
+)
+ab22 = stored(HSY, "Tulokset", "AB22")
+add(
+    "buildings_energy",
+    "stored_displayed",
+    "The Muutos-% 2023-2024 cell for Helsinki's total shows 11. What is the stored change to two "
+    "decimals?",
+    f"The cell stores {f2(ab22)}%; the display rounds it to 11.",
+    [cell_ev(HSY, "Tulokset", "AB22", "stored change 2023-2024")],
+    [num(q2(ab22), "%")],
+)
+h90 = hsy(22, 1990)
+add(
+    "buildings_energy",
+    "lookup",
+    "What was Helsinki's total energy consumption in 1990, using the stored value?",
+    f"Helsinki's 1990 total was {f2(h90)} GWh.",
+    [hev(22, 1990, "Helsinki total 1990")],
+    [num(q2(h90), "GWh")],
+)
+parts = [hsy(r, 2024) for r in (24, 25, 26)]
+sector = hsy(27, 2024)
+gap = sector - sum(parts, Decimal(0))
+add(
+    "buildings_energy",
+    "data_quality",
+    "Do Helsinki's 2024 residential, services and industry rows add up to its sector total?",
+    ("Yes. " if abs(gap) < Decimal("0.005") else "Not exactly. ")
+    + f"The three rows sum to {f2(sum(parts, Decimal(0)))} GWh against a stated total of "
+    f"{f2(sector)} GWh, a difference of {f2(abs(gap))} GWh.",
+    [hev(r, 2024, "Helsinki sector rows 2024") for r in (24, 25, 26, 27)],
+    [num(q2(sector), "GWh")],
+)
+kv24, kv23 = hsy(61, 2024), hsy(61, 2023)
+add(
+    "buildings_energy",
+    "compare",
+    "Did Kauniainen's total energy use rise or fall from 2023 to 2024, and by how many GWh?",
+    f"It {'rose' if kv24 > kv23 else 'fell'} by {f2(abs(kv24 - kv23))} GWh, from {f2(kv23)} "
+    f"to {f2(kv24)} GWh.",
+    [hev(61, 2023, "Kauniainen total 2023"), hev(61, 2024, "Kauniainen total 2024")],
+    [num(q2(abs(kv24 - kv23)), "GWh")],
+)
+
+# greenery
+add(
+    "urban_greenery",
+    "semantics",
+    "trees.gpkg and tpo-trees.csv have similar names. Can I assume they hold the same records?",
+    "No. Similar filenames do not establish identical record populations or versions; the rows "
+    "and identifiers must be checked before joining.",
+    [(GUIDE_G, guide_loc(GUIDE_G, "Similar filenames"), "names do not establish identity")],
+    [yes_no("no")],
+)
+add(
+    "urban_greenery",
+    "semantics",
+    "Can I fill the blank confirmed-date values in tpo-trees.csv with the made-date to tidy it up?",
+    "No. The guide says to preserve nulls; a blank confirmed-date must stay blank rather than be "
+    "filled with another field.",
+    [(GUIDE_G, guide_loc(GUIDE_G, "Preserve nulls"), "preserve nulls")],
+    [yes_no("no"), kw("preserve nulls", "null", "blank")],
+)
+rank4 = valid["reference"].iloc[3]
+ha4 = Decimal(repr(float(bng.loc[bng["reference"] == rank4].area.iloc[0]))) / 10000
+add(
+    "urban_greenery",
+    "spatial",
+    f"What is the area of zone {rank4} in hectares, in British National Grid metres, without "
+    f"repairing its boundary?",
+    f"Zone {rank4} covers {f2(ha4)} hectares in British National Grid (EPSG:27700).",
+    [(ZONES, f"layer zones-2026-06-23.geojson, feature reference={rank4}", f"{f2(ha4)} ha")],
+    [num(q2(ha4), "ha")],
+)
+inside = gpd.sjoin(gpkg, bng[["reference", "geometry"]], predicate="covered_by")
+busiest = inside["reference_right"].value_counts()
+zref, zn = busiest.index[0], int(busiest.iloc[0])
+add(
+    "urban_greenery",
+    "spatial",
+    f"How many tree points in trees.gpkg lie inside zone {zref}, counting points on its boundary?",
+    f"{zn} tree points from trees.gpkg lie inside zone {zref} (boundary included), measured in "
+    f"British National Grid.",
+    [
+        (ZONES, f"layer zones-2026-06-23.geojson, feature reference={zref}", "zone polygon"),
+        (GPKG, "layer ezytreevcurrenttpotrees", "tree points"),
+    ],
+    [num(Decimal(zn), None, 0)],
+)
+centre = next(r for _, r in gpkg.iterrows() if int((gpkg.distance(r.geometry) <= 50).sum()) >= 6)
+d = gpkg.geometry.distance(centre.geometry)
+n50 = int((d <= 50).sum())
+add(
+    "urban_greenery",
+    "spatial",
+    f"How many trees in trees.gpkg lie within 50 m of tree {centre['reference']}, including that "
+    f"tree and any exactly 50 m away?",
+    f"{n50} trees, including {centre['reference']} itself, lie within 50 m (boundary included) in "
+    f"British National Grid.",
+    [(GPKG, f"layer ezytreevcurrenttpotrees, feature reference={centre['reference']}", "centre")],
+    [num(Decimal(n50), None, 0)],
+)
+add(
+    "urban_greenery",
+    "spatial",
+    "What geometry types do zones-2026-06-23.geojson and trees.gpkg contain?",
+    f"zones-2026-06-23.geojson contains {', '.join(sorted(set(zones.geom_type)))} geometries and "
+    f"trees.gpkg contains {', '.join(sorted(set(gpkg.geom_type)))} geometries.",
+    [
+        (ZONES, "layer zones-2026-06-23.geojson", "geometry type"),
+        (GPKG, "layer ezytreevcurrenttpotrees", "geometry type"),
+    ],
+    [kw("Polygon", "polygon"), kw("Point", "point")],
+)
+add(
+    "urban_greenery",
+    "count",
+    "How many features does trees.gpkg hold, and what is its layer called?",
+    f"trees.gpkg has one layer, ezytreevcurrenttpotrees, with {len(gpkg):,} features.",
+    [(GPKG, "layer ezytreevcurrenttpotrees", f"{len(gpkg):,} features")],
+    [num(Decimal(len(gpkg)), None, 0), kw("ezytreevcurrenttpotrees", "ezytreevcurrenttpotrees")],
+)
+geo_refs = set(gtrees["reference"].astype(str))
+csv_refs = set(trees["reference"])
+add(
+    "urban_greenery",
+    "data_quality",
+    "How many reference values in trees-2026-06-23.geojson also appear in tpo-trees.csv?",
+    f"{len(geo_refs & csv_refs)} of the GeoJSON's {len(geo_refs):,} references appear in "
+    f"tpo-trees.csv: the files use different reference schemes (GeoJSON "
+    f"{sorted(geo_refs)[0]}, CSV {sorted(csv_refs)[0]}), so they cannot be joined on reference.",
+    [
+        (TREES_GEOJSON, "layer trees-2026-06-23.geojson, field reference", "GeoJSON references"),
+        (TREES_CSV, "column reference", "CSV references"),
+    ],
+    [num(Decimal(len(geo_refs & csv_refs)), None, 0), kw("different reference schemes", "differ")],
+)
+gdup = int(groups["reference"].duplicated().sum())
+add(
+    "urban_greenery",
+    "data_quality",
+    "Does tpo-groups.csv contain duplicate reference values?",
+    "No, every reference in tpo-groups.csv is unique."
+    if gdup == 0
+    else f"Yes, {gdup} references are repeated.",
+    [(GROUPS_CSV, "column reference", f"{gdup} duplicates")],
+    [yes_no("no" if gdup == 0 else "yes")],
+)
+named = orders[orders["name"] != ""].iloc[5]
+add(
+    "urban_greenery",
+    "lookup",
+    f"What name is recorded for order {named['reference']} in trees-dataset-2026-06-23.csv?",
+    f'Order {named["reference"]} is named "{named["name"]}".',
+    [(DATASET_CSV, f"reference={named['reference']}, name", named["name"])],
+    [kw(named["name"], *named["name"].split()[:2])],
 )
 
 # ----------------------------------------------------------------

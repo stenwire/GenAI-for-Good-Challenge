@@ -74,3 +74,39 @@ def diff(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
     out = pd.concat([da, db], axis=1)
     out["delta"] = out["b"] - out["a"]
     return out.reset_index(names="domain")
+
+
+def plan_stats(records) -> pd.DataFrame:
+    """Plans made, plans whose every step ran (after at most the configured repairs), repairs."""
+    rows = []
+    for r in records.values():
+        repairs = sum(1 for c in r.calls if c.purpose == "repair")
+        rows.append(
+            {
+                "route": r.route.qtype.value if r.route else "none",
+                "planned": r.plan is not None and bool(r.plan.steps),
+                "executed": bool(r.results) and all(x.ok for x in r.results),
+                "repairs": repairs,
+                "calls": r.total_calls,
+            }
+        )
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    by = df.groupby("route").agg(
+        questions=("planned", "size"),
+        planned=("planned", "sum"),
+        executed=("executed", "sum"),
+        repairs=("repairs", "sum"),
+    )
+    total = by.sum().to_frame().T.assign(route="all").set_index("route")
+    out = pd.concat([by, total]).reset_index()
+    out["executed_share"] = (out["executed"] / out["planned"].where(out["planned"] > 0)).fillna(0.0)
+    return out.astype({"questions": int, "planned": int, "executed": int, "repairs": int})
+
+
+def render_plans(records) -> str:
+    df = plan_stats(records)
+    if df.empty or not df["planned"].sum():
+        return ""
+    return "## Plans (executed = every step ok after at most the allowed repairs)\n\n" + _table(df)

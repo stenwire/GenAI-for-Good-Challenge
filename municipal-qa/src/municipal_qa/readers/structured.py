@@ -49,6 +49,18 @@ def is_geojson(data: Any) -> bool:
     )
 
 
+def feature_records(data: dict) -> list[dict]:
+    """GeoJSON properties, or CityJSON-feature CityObjects with their attributes."""
+    out = []
+    for f in data["features"]:
+        if "CityObjects" in f and "properties" not in f:
+            for oid, obj in (f.get("CityObjects") or {}).items():
+                out.append({"id": oid, "type": obj.get("type"), **(obj.get("attributes") or {})})
+        else:
+            out.append(f.get("properties") or {})
+    return out
+
+
 def _flatten(obj: dict, prefix: str = "") -> dict[str, Any]:
     out: dict[str, Any] = {}
     for k, v in obj.items():
@@ -191,8 +203,7 @@ def _xml_summary(root: etree._Element) -> tuple[Counter, int]:
 
 class StructuredReader:
     name = "structured"
-    # .geojson here until the vector reader (T-202) takes it over.
-    suffixes = (".json", ".geojson", ".xml", ".xsd")
+    suffixes = (".json", ".xml", ".xsd")
 
     def _kind(self, src: SourceInfo) -> str:
         return (
@@ -203,20 +214,16 @@ class StructuredReader:
 
     def profile(self, src: SourceInfo) -> SourceProfile:
         tables, warnings = [], []
-        if src.suffix in (".json", ".geojson"):
+        if src.suffix == ".json":
             data = load_json(src.path)
             if is_geojson(data):
                 feats = data["features"]
-                tables.append(
-                    _profile_records(src.original_file, [f.get("properties") or {} for f in feats])
-                )
+                tables.append(_profile_records(src.original_file, feature_records(data)))
                 geoms = Counter((f.get("geometry") or {}).get("type") for f in feats)
                 summary = (
                     f"{src.original_file}: GeoJSON, {len(feats)} features, geometry {dict(geoms)}"
                 )
-                warnings.append(
-                    "GeoJSON read as properties only; spatial ops need the vector reader"
-                )
+                warnings.append("FeatureCollection without readable geometry: properties only")
             elif isinstance(data, list) and data and all(isinstance(r, dict) for r in data):
                 tables.append(_profile_records(src.original_file, data))
                 summary = (
@@ -249,11 +256,12 @@ class StructuredReader:
     def passages(self, src: SourceInfo) -> list[Passage]:
         pb = PassageBuilder(src.source_id)
         kind = self._kind(src)
-        if src.suffix in (".json", ".geojson"):
+        if src.suffix == ".json":
             data = load_json(src.path)
             if is_geojson(data):
                 feats = data["features"]
-                props = sorted({k for f in feats for k in (f.get("properties") or {})})
+                recs = feature_records(data)
+                props = list(dict.fromkeys(k for r in recs[:500] for k in r))
                 pb.add(
                     f"{src.original_file}: {len(feats)} features; properties: " + ", ".join(props),
                     "header",
@@ -261,9 +269,9 @@ class StructuredReader:
                     "/features",
                 )
                 _walk(pb, {k: v for k, v in data.items() if k != "features"}, [], "metadata")
-                if len(feats) <= RECORD_PASSAGE_LIMIT:
-                    for i, f in enumerate(feats):
-                        _walk(pb, f.get("properties") or {}, ["features", i, "properties"], kind)
+                if len(recs) <= RECORD_PASSAGE_LIMIT and len(recs) == len(feats):
+                    for i, r in enumerate(recs):
+                        _walk(pb, r, ["features", i, "properties"], kind)
             elif isinstance(data, list) and data and all(isinstance(r, dict) for r in data):
                 fields = list(dict.fromkeys(k for r in data[:500] for k in _flatten(r)))
                 pb.add(
@@ -295,11 +303,11 @@ class StructuredReader:
         return pb.items
 
     def load_table(self, src: SourceInfo, table: str | None = None) -> pd.DataFrame:
-        if src.suffix not in (".json", ".geojson"):
+        if src.suffix != ".json":
             raise UnsupportedFormat(f"{src.original_file}: XML has no table interface yet")
         data = load_json(src.path)
         if is_geojson(data):
-            return records_frame([f.get("properties") or {} for f in data["features"]])
+            return records_frame(feature_records(data))
         if isinstance(data, list) and data and all(isinstance(r, dict) for r in data):
             return records_frame(data)
         raise UnsupportedFormat(f"{src.original_file}: not a list of records")

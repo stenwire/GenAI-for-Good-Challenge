@@ -41,15 +41,79 @@ def setup_data(
 @app.command()
 def profile(
     source: Annotated[str | None, typer.Option(help="Profile one source ID only.")] = None,
+    workers: Annotated[int, typer.Option(help="Parallel worker processes.")] = 4,
+    force: Annotated[bool, typer.Option("--force", help="Rebuild cached profiles.")] = False,
 ) -> None:
     """Build or refresh the source profile cache."""
-    _not_implemented("profile")
+    import time
+
+    from municipal_qa.config import load_config
+    from municipal_qa.data.manifest import load_manifest
+    from municipal_qa.profiling.profile import ProfileStore, profile_summary
+
+    cfg = load_config()
+    manifest = load_manifest(cfg)
+    if source:
+        if source not in manifest:
+            typer.echo(f"unknown source {source}", err=True)
+            raise typer.Exit(code=1)
+        manifest = {source: manifest[source]}
+    store = ProfileStore(cfg, manifest)
+    t0 = time.perf_counter()
+    if force:
+        for sid in manifest:
+            store.path(sid).unlink(missing_ok=True)
+    store.build_all(workers=workers)
+    info = profile_summary(store)
+    kinds = ", ".join(f"{k} {n}" for k, n in info["kinds"].items())
+    typer.echo(
+        f"profiled {len(manifest)} sources in {time.perf_counter() - t0:.1f}s -> "
+        f"{store.cache_dir}\nkinds: {kinds}\nfallback (binary with warning): "
+        f"{len(info['fallbacks'])}"
+    )
+    for sid, name, why in info["fallbacks"]:
+        typer.echo(f"  {sid} {name}: {why}")
 
 
 @app.command()
-def index() -> None:
-    """Build the retrieval index."""
-    _not_implemented("index")
+def index(
+    source: Annotated[str | None, typer.Option(help="Index one source ID only.")] = None,
+    force: Annotated[bool, typer.Option("--force", help="Re-embed cached sources.")] = False,
+) -> None:
+    """Build the retrieval index: passages, column passages and encoder vectors."""
+    import time
+
+    import municipal_qa.readers  # noqa: F401
+    from municipal_qa.config import load_config
+    from municipal_qa.data.manifest import load_manifest
+    from municipal_qa.llm.client import LLMClient, LLMError
+    from municipal_qa.profiling.profile import ProfileStore
+    from municipal_qa.retrieval.index import Retriever
+
+    cfg = load_config()
+    manifest = load_manifest(cfg)
+    if source:
+        if source not in manifest:
+            typer.echo(f"unknown source {source}", err=True)
+            raise typer.Exit(code=1)
+        manifest = {source: manifest[source]}
+    client = LLMClient(cfg)
+    try:
+        info = client.check_embedder()
+    except LLMError as e:
+        typer.echo(f"FAILED: {e}", err=True)
+        raise typer.Exit(code=1) from e
+    retriever = Retriever(cfg, ProfileStore(cfg, manifest), client)
+    if force:
+        for sid in manifest:
+            retriever._path(sid).unlink(missing_ok=True)
+    t0 = time.perf_counter()
+    meta = retriever.build(list(manifest))
+    typer.echo(
+        f"indexed {meta['sources']} sources, {meta['passages']:,} passages in "
+        f"{time.perf_counter() - t0:.1f}s -> {retriever.dir}\nencoder: {info['name']} "
+        f"({info['architecture']}, {info['parameter_count']:,} parameters, {info['capabilities']})"
+    )
 
 
 @app.command("check-model")
@@ -149,8 +213,8 @@ def evaluate(
     import json
 
     from municipal_qa.config import load_config
-    from municipal_qa.evaluation.report import render
-    from municipal_qa.evaluation.scorer import evaluate_run
+    from municipal_qa.evaluation.report import render, render_plans
+    from municipal_qa.evaluation.scorer import evaluate_run, load_records
 
     cfg = load_config()
     run_dir = cfg.artifacts_dir / "runs" / run_id
@@ -163,6 +227,9 @@ def evaluate(
     split = split or "dev"
     typer.echo(f"# Evaluation of {run_id} ({split})\n")
     typer.echo(render(evaluate_run(run_dir, split, cfg)))
+    plans = render_plans(load_records(run_dir))
+    if plans:
+        typer.echo("\n" + plans)
 
 
 @app.command()

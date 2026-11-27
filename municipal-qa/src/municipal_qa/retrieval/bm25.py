@@ -20,13 +20,20 @@ _PKG = Path(__file__).resolve().parents[1]
 READER_LIBS = [
     "beautifulsoup4",
     "duckdb",
+    "geopandas",
+    "laspy",
+    "lazrs",
     "lxml",
     "openpyxl",
     "pandas",
     "pdfminer.six",
     "pdfplumber",
     "pillow",
+    "pyogrio",
+    "pyproj",
     "python-docx",
+    "rasterio",
+    "shapely",
 ]
 
 
@@ -104,7 +111,7 @@ class PassageStore:
         return items or [_fallback_passage(src, "the reader found no text")]
 
 
-_TOKEN = re.compile(r"\w\w+", re.UNICODE)
+_TOKEN = re.compile(r"\[\w{1,5}\]|\w\w+", re.UNICODE)  # keeps markers such as [z], [r]
 
 
 def _tokens(texts: list[str]) -> list[list[str]]:

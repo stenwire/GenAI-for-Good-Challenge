@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from dotenv import dotenv_values
@@ -95,8 +95,11 @@ class BudgetConfig(BaseModel):
 
 
 class RetrievalConfig(BaseModel):
-    embedding_model: str
-    reranker_model: str
+    embedding_model: str | None = None  # Ollama encoder; None = BM25 only
+    reranker_model: str | None = None
+    embed_batch: int = 64
+    rrf_k: int = 60
+    max_per_source: int = 3
     k_bm25: int = 30
     k_dense: int = 30
     k_final: int = 8
@@ -106,6 +109,7 @@ class RetrievalConfig(BaseModel):
 
 
 class PipelineConfig(BaseModel):
+    mode: Literal["planner", "baseline"] = "planner"
     max_repairs: int = 2
     max_extra_plans: int = 2
     enable_rewrite: bool = True
@@ -125,6 +129,16 @@ class Config(BaseModel):
     retrieval: RetrievalConfig
     pipeline: PipelineConfig
     run: RunConfig
+
+    @field_validator("retrieval")
+    @classmethod
+    def _embedder_is_not_the_llm(cls, v: RetrievalConfig, info) -> RetrievalConfig:
+        llm = info.data.get("llm")
+        if v.embedding_model and llm and v.embedding_model == llm.model:
+            raise ValueError(
+                "retrieval.embedding_model must be an encoder, not the generative model"
+            )
+        return v
 
     @property
     def sources_dir(self) -> Path:

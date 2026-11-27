@@ -1,4 +1,4 @@
-"""The only module that calls the generative model (Ollama, local HTTP)."""
+"""The only module that talks to model servers: the generative model and the encoder (Ollama)."""
 
 from __future__ import annotations
 
@@ -37,6 +37,7 @@ class LLMClient:
             transport=transport,
         )
         self._model_info: dict | None = None
+        self._embed_info: dict | None = None
 
     def _post(self, path: str, payload: dict) -> dict:
         # Retry only when no response arrived, so nothing was generated.
@@ -83,6 +84,48 @@ class LLMClient:
             "quantization": (show.get("details") or {}).get("quantization_level"),
         }
         return self._model_info
+
+    def check_embedder(self) -> dict:
+        """The retrieval encoder must report only embedding capability (no text generation)."""
+        name = self.cfg.retrieval.embedding_model
+        if not name:
+            raise LLMError("no retrieval.embedding_model configured")
+        if name == self.llm.model:
+            raise LLMError("the embedder must not be the generative model")
+        show = self._post("/api/show", {"model": name})
+        caps = show.get("capabilities") or []
+        if "embedding" not in caps or "completion" in caps:
+            raise LLMError(f"{name}: capabilities {caps}; an embedding-only encoder is required")
+        info = show.get("model_info") or {}
+        self._embed_info = {
+            "name": name,
+            "architecture": info.get("general.architecture"),
+            "parameter_count": info.get("general.parameter_count"),
+            "capabilities": caps,
+        }
+        return self._embed_info
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        """Vectors only, from /api/embed; never a generation, so no question budget is used."""
+        if self._embed_info is None:
+            self.check_embedder()
+        out: list[list[float]] = []
+        n = max(1, self.cfg.retrieval.embed_batch)
+        for i in range(0, len(texts), n):
+            data = self._post(
+                "/api/embed",
+                {
+                    "model": self.cfg.retrieval.embedding_model,
+                    "input": texts[i : i + n],
+                    "truncate": True,
+                    "keep_alive": self.llm.keep_alive,
+                },
+            )
+            vecs = data.get("embeddings") if isinstance(data, dict) else None
+            if not isinstance(vecs, list) or len(vecs) != len(texts[i : i + n]):
+                raise LLMError("malformed /api/embed reply")
+            out += vecs
+        return out
 
     def chat(
         self,

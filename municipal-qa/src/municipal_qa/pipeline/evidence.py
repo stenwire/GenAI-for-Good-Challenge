@@ -45,3 +45,36 @@ def from_facts(facts: list[Fact], limit: int = MAX_LINES) -> list[str]:
             if len(out) >= limit:
                 return out
     return out
+
+
+_NUM = re.compile(r"^-?[\d,]+(?:\.\d+)?")
+
+
+def _key(display: str) -> str | None:
+    d = display.strip()
+    m = _NUM.match(d)
+    if m and any(ch.isdigit() for ch in m.group(0)):
+        return m.group(0).replace(",", "")
+    return d.lower() if 0 < len(d) <= 40 else None
+
+
+def used(answer: str, facts: list[Fact]) -> list[Fact]:
+    """Facts whose value (number or short text) appears in the answer."""
+    a = answer.lower().replace(",", "")
+    return [f for f in facts if (k := _key(f.display)) and k in a]
+
+
+def for_answer(answer: str, facts: list[Fact], passages: list[Passage], text_first: bool,
+               limit: int = MAX_LINES) -> list[str]:  # fmt: skip
+    """Facts used in the answer first; passages lead for semantics and fill thin evidence."""
+    fact_lines = from_facts(used(answer, facts), limit) or from_facts(facts[:3], limit)
+    pas_lines = from_passages(passages, limit)
+    if text_first:
+        ordered = pas_lines[:3] + fact_lines + pas_lines[3:]
+    else:
+        ordered = fact_lines + (pas_lines if len(fact_lines) < 2 else pas_lines[:1])
+    out: list[str] = []
+    for ln in ordered:
+        if ln not in out:
+            out.append(ln)
+    return out[:limit]
